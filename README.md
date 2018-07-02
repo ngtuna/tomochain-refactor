@@ -1,6 +1,6 @@
 ## Tomochain
 
-[![Build Status](https://travis-ci.org/tomochain/tomochain.svg?branch=master)](https://travis-ci.org/tomochain/tomochain)
+[This repo contains refactored code for Tomochain]
 
 Blockchain for decentralized applications, token issuance and integration
 
