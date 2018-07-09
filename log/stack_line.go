@@ -27,7 +27,7 @@ type StackFrame struct {
 func GetLineDetail() string {
 	stackMax := make([]uintptr, MaxStackDepth)
 	length := runtime.Callers(2, stackMax[:])
-	stack := stackMax [:length]
+	stack := stackMax [2:length-1]
 
 	frames := make([]StackFrame, len(stack))
 	for i, pc := range stack {
