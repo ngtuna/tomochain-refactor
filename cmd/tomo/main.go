@@ -1,18 +1,18 @@
-// Copyright 2014 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2014 The tomochain Authors
+// This file is part of tomochain.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// tomochain is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// tomochain is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with tomochain. If not, see <http://www.gnu.org/licenses/>.
 
 // tomo is the official command-line client for Ethereum.
 package main
@@ -47,7 +47,7 @@ var (
 	// Git SHA1 commit hash of the release (set via linker flags)
 	gitCommit = ""
 	// The app that holds all commands and flags.
-	app = utils.NewApp(gitCommit, "the go-ethereum command line interface")
+	app = utils.NewApp(gitCommit, "the tomochain command line interface")
 	// flags that configure the node
 	nodeFlags = []cli.Flag{
 		utils.IdentityFlag,
@@ -147,7 +147,7 @@ func init() {
 	// Initialize the CLI app and start tomo
 	app.Action = tomo
 	app.HideVersion = true // we have a command to print the version
-	app.Copyright = "Copyright 2013-2017 The go-ethereum Authors"
+	app.Copyright = "Copyright 2013-2017 The tomochain Authors"
 	app.Commands = []cli.Command{
 		// See chaincmd.go:
 		initCommand,
@@ -284,13 +284,13 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		if ctx.GlobalBool(utils.LightModeFlag.Name) || ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-		var ethereum *eth.Ethereum
-		if err := stack.Service(&ethereum); err != nil {
+		var tomochain *eth.Ethereum
+		if err := stack.Service(&tomochain); err != nil {
 			utils.Fatalf("Ethereum service not running: %v", err)
 		}
 		go func() {
 			started := false
-			ok, err := ethereum.ValidateStaker()
+			ok, err := tomochain.ValidateStaker()
 			if err != nil {
 				utils.Fatalf("Can't verify validator permission: %v", err)
 			}
@@ -301,13 +301,13 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 					type threaded interface {
 						SetThreads(threads int)
 					}
-					if th, ok := ethereum.Engine().(threaded); ok {
+					if th, ok := tomochain.Engine().(threaded); ok {
 						th.SetThreads(threads)
 					}
 				}
 				// Set the gas price to the limits from the CLI and start mining
-				ethereum.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
-				if err := ethereum.StartStaking(true); err != nil {
+				tomochain.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
+				if err := tomochain.StartStaking(true); err != nil {
 					utils.Fatalf("Failed to start staking: %v", err)
 				}
 				started = true
@@ -317,14 +317,14 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 
 			for range core.Checkpoint {
 				log.Info("Checkpoint!!! It's time to reconcile node's state...")
-				ok, err := ethereum.ValidateStaker()
+				ok, err := tomochain.ValidateStaker()
 				if err != nil {
 					utils.Fatalf("Can't verify validator permission: %v", err)
 				}
 				if !ok {
 					log.Info("Only validator can mine blocks. Cancelling mining on this node...")
 					if started {
-						ethereum.StopMining()
+						tomochain.StopMining()
 						started = false
 					}
 					log.Info("Cancelled mining mode!!!")
@@ -335,13 +335,13 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 						type threaded interface {
 							SetThreads(threads int)
 						}
-						if th, ok := ethereum.Engine().(threaded); ok {
+						if th, ok := tomochain.Engine().(threaded); ok {
 							th.SetThreads(threads)
 						}
 					}
 					// Set the gas price to the limits from the CLI and start mining
-					ethereum.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
-					if err := ethereum.StartStaking(true); err != nil {
+					tomochain.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
+					if err := tomochain.StartStaking(true); err != nil {
 						utils.Fatalf("Failed to start mining: %v", err)
 					}
 					started = true

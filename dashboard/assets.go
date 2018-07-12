@@ -56,7 +56,7 @@ var _indexHtml = []byte(`<!DOCTYPE html>
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title>Go Ethereum Dashboard</title>
-        <link rel="shortcut icon" type="image/ico" href="https://ethereum.org/favicon.ico" />
+        <link rel="shortcut icon" type="image/ico" href="https://tomochain.org/favicon.ico" />
         <style>
             ::-webkit-scrollbar {
                 width: 16px;
