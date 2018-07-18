@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
-// tomo is the official command-line client for Ethereum.
+// tomo is the official command-line client for TomoChain.
 package main
 
 import (
@@ -27,16 +27,22 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/cmd/utils"
+
 	"github.com/ethereum/go-ethereum/console"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/eth"
+
+
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/internal/debug"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
 	"gopkg.in/urfave/cli.v1"
+
+	"github.com/tomochain/tomochain/cmd/utils"
+	"github.com/tomochain/tomochain/internal/debug"
+
+	"github.com/tomochain/tomochain/eth"
+	"github.com/tomochain/tomochain/core"
 )
 
 const (
@@ -280,13 +286,13 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	}()
 	// Start auxiliary services if enabled
 	if ctx.GlobalBool(utils.MiningEnabledFlag.Name) || ctx.GlobalBool(utils.DeveloperFlag.Name) {
-		// Mining only makes sense if a full Ethereum node is running
+		// Mining only makes sense if a full TomoChain node is running
 		if ctx.GlobalBool(utils.LightModeFlag.Name) || ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-		var ethereum *eth.Ethereum
+		var ethereum *eth.TomoChain
 		if err := stack.Service(&ethereum); err != nil {
-			utils.Fatalf("Ethereum service not running: %v", err)
+			utils.Fatalf("TomoChain service not running: %v", err)
 		}
 		go func() {
 			started := false
@@ -301,12 +307,12 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 					type threaded interface {
 						SetThreads(threads int)
 					}
-					if th, ok := ethereum.Engine().(threaded); ok {
+					if th, ok := ethereum.GetEngine().(threaded); ok {
 						th.SetThreads(threads)
 					}
 				}
 				// Set the gas price to the limits from the CLI and start mining
-				ethereum.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
+				ethereum.GetTxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
 				if err := ethereum.StartStaking(true); err != nil {
 					utils.Fatalf("Failed to start staking: %v", err)
 				}
@@ -335,12 +341,12 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 						type threaded interface {
 							SetThreads(threads int)
 						}
-						if th, ok := ethereum.Engine().(threaded); ok {
+						if th, ok := ethereum.GetEngine().(threaded); ok {
 							th.SetThreads(threads)
 						}
 					}
 					// Set the gas price to the limits from the CLI and start mining
-					ethereum.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
+					ethereum.GetTxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
 					if err := ethereum.StartStaking(true); err != nil {
 						utils.Fatalf("Failed to start mining: %v", err)
 					}

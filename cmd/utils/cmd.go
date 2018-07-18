@@ -32,10 +32,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/internal/debug"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/tomochain/tomochain/internal/debug"
+
 )
 
 const (
@@ -168,7 +171,7 @@ func ImportChain(chain *core.BlockChain, fn string) error {
 }
 
 func missingBlocks(chain *core.BlockChain, blocks []*types.Block) []*types.Block {
-	head := chain.CurrentBlock()
+	head := chain.GetCurrentBlock()
 	for i, block := range blocks {
 		// If we're behind the chain head, only check block, state is available at head
 		if head.NumberU64() > block.NumberU64() {

@@ -28,8 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc"
+
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -40,6 +39,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/hashicorp/golang-lru"
+	"github.com/ethereum/go-ethereum/consensus/misc"
+
+	ethConsensus "github.com/ethereum/go-ethereum/consensus"
+	"github.com/tomochain/tomochain/consensus"
 )
 
 const (
@@ -367,10 +370,10 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainReader, header *type
 	return c.verifySeal(chain, header, parents)
 }
 
-func (c *Clique) GetSnapshot(chain consensus.ChainReader, header *types.Header) (*Snapshot, error) {
+func (c *Clique) GetSnapshot(chain ethConsensus.ChainReader, header *types.Header) (*Snapshot, error) {
 	number := header.Number.Uint64()
 	log.Trace("take snapshot", "number", number, "hash", header.Hash())
-	snap, err := c.snapshot(chain, number, header.Hash(), nil)
+	snap, err := c.snapshot(chain.(consensus.ChainReader), number, header.Hash(), nil)
 	if err != nil {
 		return nil, err
 	}

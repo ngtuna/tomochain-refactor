@@ -14,133 +14,153 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package eth implements the Ethereum protocol.
+// Package eth implements the TomoChain protocol.
 package eth
 
 import (
 	"errors"
 	"fmt"
 	"math/big"
-	"runtime"
-	"sync"
-	"sync/atomic"
-
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/clique"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/contracts"
+
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/eth"
+	ethconsensus "github.com/ethereum/go-ethereum/consensus"
+	"github.com/tomochain/tomochain/eth/fetcher"
+
+	"github.com/tomochain/tomochain/contracts"
+	tomocommon "github.com/tomochain/tomochain/common"
+	"github.com/tomochain/tomochain/consensus/clique"
+	"github.com/tomochain/tomochain/consensus"
+	"sync/atomic"
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/tomochain/tomochain/internal/ethapi"
+	"sync"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/event"
 )
 
-type LesServer interface {
-	Start(srvr *p2p.Server)
-	Stop()
-	Protocols() []p2p.Protocol
-	SetBloomBitsIndexer(bbIndexer *core.ChainIndexer)
-}
-
-// Ethereum implements the Ethereum full node service.
-type Ethereum struct {
-	config      *Config
-	chainConfig *params.ChainConfig
+type TomoChain struct {
+	Config      *eth.Config
+	ChainConfig *params.ChainConfig
 
 	// Channel for shutting down the service
-	shutdownChan  chan bool    // Channel for shutting down the ethereum
-	stopDbUpgrade func() error // stop chain db sequential key upgrade
+	ShutdownChan chan bool // Channel for shutting down the TomoChain
 
 	// Handlers
-	txPool          *core.TxPool
-	blockchain      *core.BlockChain
-	protocolManager *ProtocolManager
-	lesServer       LesServer
+	TxPool          *core.TxPool
+	Blockchain      *core.BlockChain
+	ProtocolManager *TomoProtocolManager
+	LesServer       eth.LesServer
 
 	// DB interfaces
-	chainDb ethdb.Database // Block chain database
+	ChainDb ethdb.Database // Block chain database
 
-	eventMux       *event.TypeMux
-	engine         consensus.Engine
-	accountManager *accounts.Manager
+	EventMux       *event.TypeMux
+	Engine         consensus.Engine
+	AccountManager *accounts.Manager
 
-	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	bloomIndexer  *core.ChainIndexer             // Bloom indexer operating during block imports
+	BloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
+	BloomIndexer  *core.ChainIndexer             // Bloom indexer operating during block imports
 
-	ApiBackend *EthApiBackend
+	APIBackend *EthAPIBackend
 
-	miner     *miner.Miner
-	gasPrice  *big.Int
-	etherbase common.Address
+	Miner     *miner.Miner
+	GasPrice  *big.Int
+	Etherbase common.Address
 
-	networkId     uint64
-	netRPCService *ethapi.PublicNetAPI
+	NetworkID     uint64
+	NetRPCService *ethapi.PublicNetAPI
 
-	lock        sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
-	IPCEndpoint string
-	Client      *ethclient.Client // Global ipc client instance.
+	Lock sync.RWMutex // Protects the variadic fields (E.g. gas price and GetEtherbase)
+
+	stopDbUpgrade func() error // stop chain db sequential key upgrade
+	IPCEndpoint   string
+	Client        *ethclient.Client // Global ipc client instance.
+}
+func (s *TomoChain) StopMining()         { s.Miner.Stop() }
+func (s *TomoChain) GetAccountManager() *accounts.Manager { return s.AccountManager }
+func (s *TomoChain) BlockChain() *core.BlockChain         { return s.Blockchain }
+func (s *TomoChain) GetTxPool() *core.TxPool              { return s.TxPool }
+func (s *TomoChain) GetEventMux() *event.TypeMux          { return s.EventMux }
+func (s *TomoChain) GetEngine() consensus.Engine          { return s.Engine }
+func (s *TomoChain) GetChainDb() ethdb.Database           { return s.ChainDb }
+func (s *TomoChain) IsListening() bool                    { return true } // Always listening
+func (s *TomoChain) EthVersion() int                      { return int(s.ProtocolManager.SubProtocols[0].Version) }
+func (s *TomoChain) NetVersion() uint64                   { return s.NetworkID }
+func (s *TomoChain) Downloader() *downloader.Downloader   { return s.ProtocolManager.Downloader }
+func (s *TomoChain) GetEtherbase() (eb common.Address, err error) {
+	s.Lock.RLock()
+	etherbase := s.Etherbase
+	s.Lock.RUnlock()
+
+	if etherbase != (common.Address{}) {
+		return etherbase, nil
+	}
+	if wallets := s.GetAccountManager().Wallets(); len(wallets) > 0 {
+		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
+			etherbase := accounts[0].Address
+
+			s.Lock.Lock()
+			s.Etherbase = etherbase
+			s.Lock.Unlock()
+
+			log.Info("Etherbase automatically configured", "address", etherbase)
+			return etherbase, nil
+		}
+	}
+	return common.Address{}, fmt.Errorf("etherbase must be explicitly specified")
 }
 
-func (s *Ethereum) AddLesServer(ls LesServer) {
-	s.lesServer = ls
-	ls.SetBloomBitsIndexer(s.bloomIndexer)
-}
-
-// New creates a new Ethereum object (including the
-// initialisation of the common Ethereum object)
-func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
+// New creates a new TomoChain object (including the
+// initialisation of the common TomoChain object)
+func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 	if config.SyncMode == downloader.LightSync {
-		return nil, errors.New("can't run eth.Ethereum in light sync mode, use les.LightEthereum")
+		return nil, errors.New("can't run tomo.TomoChain in light sync mode, use les.LightEthereum")
 	}
 	if !config.SyncMode.IsValid() {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
 	}
-	chainDb, err := CreateDB(ctx, config, "chaindata")
+	chainDb, err := eth.CreateDB(ctx, config, "chaindata")
 	if err != nil {
 		return nil, err
 	}
-	stopDbUpgrade := upgradeDeduplicateData(chainDb)
+	stopDbUpgrade := eth.UpgradeDeduplicateData(chainDb)
 	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
+	engine := eth.CreateConsensusEngine(ctx, &config.Ethash, chainConfig, chainDb)
+	tomo := &TomoChain{
+		Config:         config,
+		ChainDb:        chainDb,
+		ChainConfig:    chainConfig,
+		EventMux:       ctx.EventMux,
+		AccountManager: ctx.AccountManager,
+		Engine:         engine.(consensus.Engine),
+		ShutdownChan:   make(chan bool),
+		NetworkID:      config.NetworkId,
+		GasPrice:       config.GasPrice,
+		Etherbase:      config.Etherbase,
+		BloomRequests:  make(chan chan *bloombits.Retrieval),
+		BloomIndexer:   eth.NewBloomIndexer(chainDb, params.BloomBitsBlocks),
 
-	eth := &Ethereum{
-		config:         config,
-		chainDb:        chainDb,
-		chainConfig:    chainConfig,
-		eventMux:       ctx.EventMux,
-		accountManager: ctx.AccountManager,
-		engine:         CreateConsensusEngine(ctx, &config.Ethash, chainConfig, chainDb),
-		shutdownChan:   make(chan bool),
-		stopDbUpgrade:  stopDbUpgrade,
-		networkId:      config.NetworkId,
-		gasPrice:       config.GasPrice,
-		etherbase:      config.Etherbase,
-		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks),
+		stopDbUpgrade: stopDbUpgrade,
 	}
 
-	log.Info("Initialising Ethereum protocol", "versions", ProtocolVersions, "network", config.NetworkId)
+	log.Info("Initialising TomoChain protocol", "versions", eth.ProtocolVersions, "network", config.NetworkId)
 
 	if !config.SkipBcVersionCheck {
 		bcVersion := core.GetBlockChainVersion(chainDb)
@@ -153,61 +173,61 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}
 	)
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
+	tomo.Blockchain, err = core.NewBlockChain(chainDb, cacheConfig, tomo.ChainConfig, tomo.Engine.(ethconsensus.Engine), vmConfig)
 	if err != nil {
 		return nil, err
 	}
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		eth.blockchain.SetHead(compat.RewindTo)
+		tomo.Blockchain.SetHead(compat.RewindTo)
 		core.WriteChainConfig(chainDb, genesisHash, chainConfig)
 	}
-	eth.bloomIndexer.Start(eth.blockchain)
+	tomo.BloomIndexer.Start(tomo.Blockchain)
 
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = ctx.ResolvePath(config.TxPool.Journal)
 	}
-	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain)
+	tomo.TxPool = core.NewTxPool(config.TxPool, tomo.ChainConfig, tomo.Blockchain)
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+	if tomo.ProtocolManager, err = NewProtocolManager(tomo.ChainConfig, config.SyncMode, config.NetworkId, tomo.EventMux, tomo.TxPool, tomo.Engine, tomo.Blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
-	eth.miner.SetExtra(makeExtraData(config.ExtraData))
+	tomo.Miner = miner.New(tomo, tomo.ChainConfig, tomo.GetEventMux(), tomo.Engine.(ethconsensus.Engine))
+	tomo.Miner.SetExtra(eth.MakeExtraData(config.ExtraData))
 
-	eth.ApiBackend = &EthApiBackend{eth, nil}
+	tomo.APIBackend = &EthAPIBackend{tomo, nil}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.GasPrice
 	}
-	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
+	tomo.APIBackend.Gpo = gasprice.NewOracle(tomo.APIBackend, gpoParams)
 
-	if eth.chainConfig.Clique != nil {
-		c := eth.engine.(*clique.Clique)
+	if tomo.ChainConfig.Clique != nil {
+		c := tomo.Engine.(*clique.Clique)
 
 		// Set global ipc endpoint.
-		eth.IPCEndpoint = ctx.GetConfig().IPCEndpoint()
+		tomo.IPCEndpoint = ctx.Config.IPCEndpoint()
 
 		// Inject hook for send tx sign to smartcontract after insert block into chain.
 		importedHook := func(block *types.Block) {
-			snap, err := c.GetSnapshot(eth.blockchain, block.Header())
+			snap, err := c.GetSnapshot(tomo.Blockchain, block.Header())
 			if err != nil {
 				log.Error("Fail to get snapshot for sign tx validator.")
 				return
 			}
-			if _, authorized := snap.Signers[eth.etherbase]; authorized {
-				if err := contracts.CreateTransactionSign(chainConfig, eth.txPool, eth.accountManager, block); err != nil {
+			if _, authorized := snap.Signers[tomo.Etherbase]; authorized {
+				if err := contracts.CreateTransactionSign(chainConfig, tomo.TxPool, tomo.AccountManager, block); err != nil {
 					log.Error("Fail to create tx sign for imported block", "error", err)
 					return
 				}
 			}
 		}
-		eth.protocolManager.fetcher.SetImportedHook(importedHook)
+		fetcher.SetImportedHook(tomo.ProtocolManager.Fetcher, importedHook)
 
 		// Hook reward for clique validator.
 		c.HookReward = func(chain consensus.ChainReader, state *state.StateDB, header *types.Header) error {
-			client, err := eth.GetClient()
+			client, err := tomo.GetClient()
 			if err != nil {
 				log.Error("Fail to connect IPC client for blockSigner", "error", err)
 
@@ -218,7 +238,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 			rCheckpoint := chain.Config().Clique.RewardCheckpoint
 			if number > 0 && number-rCheckpoint > 0 {
 				// Get signers in blockSigner smartcontract.
-				addr := common.HexToAddress(common.BlockSigners)
+				addr := common.HexToAddress(tomocommon.BlockSigners)
 				chainReward := new(big.Int).SetUint64(chain.Config().Clique.Reward * params.Ether)
 				totalSigner := new(uint64)
 				signers, err := contracts.GetRewardForCheckpoint(addr, number, rCheckpoint, client, totalSigner)
@@ -241,172 +261,19 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		}
 	}
 
-	return eth, nil
-}
-
-func makeExtraData(extra []byte) []byte {
-	if len(extra) == 0 {
-		// create default extradata
-		extra, _ = rlp.EncodeToBytes([]interface{}{
-			uint(params.VersionMajor<<16 | params.VersionMinor<<8 | params.VersionPatch),
-			"geth",
-			runtime.Version(),
-			runtime.GOOS,
-		})
-	}
-	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", params.MaximumExtraDataSize)
-		extra = nil
-	}
-	return extra
-}
-
-// CreateDB creates the chain database.
-func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Database, error) {
-	db, err := ctx.OpenDatabase(name, config.DatabaseCache, config.DatabaseHandles)
-	if err != nil {
-		return nil, err
-	}
-	if db, ok := db.(*ethdb.LDBDatabase); ok {
-		db.Meter("eth/db/chaindata/")
-	}
-	return db, nil
-}
-
-// CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
-func CreateConsensusEngine(ctx *node.ServiceContext, config *ethash.Config, chainConfig *params.ChainConfig, db ethdb.Database) consensus.Engine {
-	// If proof-of-authority is requested, set it up
-	if chainConfig.Clique != nil {
-		return clique.New(chainConfig.Clique, db)
-	}
-	// Otherwise assume proof-of-work
-	switch {
-	case config.PowMode == ethash.ModeFake:
-		log.Warn("Ethash used in fake mode")
-		return ethash.NewFaker()
-	case config.PowMode == ethash.ModeTest:
-		log.Warn("Ethash used in test mode")
-		return ethash.NewTester()
-	case config.PowMode == ethash.ModeShared:
-		log.Warn("Ethash used in shared mode")
-		return ethash.NewShared()
-	default:
-		engine := ethash.New(ethash.Config{
-			CacheDir:       ctx.ResolvePath(config.CacheDir),
-			CachesInMem:    config.CachesInMem,
-			CachesOnDisk:   config.CachesOnDisk,
-			DatasetDir:     config.DatasetDir,
-			DatasetsInMem:  config.DatasetsInMem,
-			DatasetsOnDisk: config.DatasetsOnDisk,
-		})
-		engine.SetThreads(-1) // Disable CPU mining
-		return engine
-	}
-}
-
-// APIs returns the collection of RPC services the ethereum package offers.
-// NOTE, some of these services probably need to be moved to somewhere else.
-func (s *Ethereum) APIs() []rpc.API {
-	apis := ethapi.GetAPIs(s.ApiBackend)
-
-	// Append any APIs exposed explicitly by the consensus engine
-	apis = append(apis, s.engine.APIs(s.BlockChain())...)
-
-	// Append all the local APIs and return
-	return append(apis, []rpc.API{
-		{
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicEthereumAPI(s),
-			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicMinerAPI(s),
-			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
-			Public:    true,
-		}, {
-			Namespace: "miner",
-			Version:   "1.0",
-			Service:   NewPrivateMinerAPI(s),
-			Public:    false,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.ApiBackend, false),
-			Public:    true,
-		}, {
-			Namespace: "admin",
-			Version:   "1.0",
-			Service:   NewPrivateAdminAPI(s),
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPublicDebugAPI(s),
-			Public:    true,
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPrivateDebugAPI(s.chainConfig, s),
-		}, {
-			Namespace: "net",
-			Version:   "1.0",
-			Service:   s.netRPCService,
-			Public:    true,
-		},
-	}...)
-}
-
-func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
-	s.blockchain.ResetWithGenesisBlock(gb)
-}
-
-func (s *Ethereum) Etherbase() (eb common.Address, err error) {
-	s.lock.RLock()
-	etherbase := s.etherbase
-	s.lock.RUnlock()
-
-	if etherbase != (common.Address{}) {
-		return etherbase, nil
-	}
-	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
-		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
-			etherbase := accounts[0].Address
-
-			s.lock.Lock()
-			s.etherbase = etherbase
-			s.lock.Unlock()
-
-			log.Info("Etherbase automatically configured", "address", etherbase)
-			return etherbase, nil
-		}
-	}
-	return common.Address{}, fmt.Errorf("etherbase must be explicitly specified")
-}
-
-// set in js console via admin interface or wrapper from cli flags
-func (self *Ethereum) SetEtherbase(etherbase common.Address) {
-	self.lock.Lock()
-	self.etherbase = etherbase
-	self.lock.Unlock()
-
-	self.miner.SetEtherbase(etherbase)
+	return tomo, nil
 }
 
 // ValidateMiner checks if node's address is in set of validators
-func (s *Ethereum) ValidateStaker() (bool, error) {
-	eb, err := s.Etherbase()
+func (s *TomoChain) ValidateStaker() (bool, error) {
+	eb, err := s.GetEtherbase()
 	if err != nil {
 		return false, err
 	}
-	if s.chainConfig.Clique != nil {
+	if s.ChainConfig.Clique != nil {
 		//check if miner's wallet is in set of validators
-		c := s.engine.(*clique.Clique)
-		snap, err := c.GetSnapshot(s.blockchain, s.blockchain.CurrentHeader())
+		c := s.Engine.(*clique.Clique)
+		snap, err := c.GetSnapshot(s.Blockchain, s.Blockchain.CurrentHeader())
 		if err != nil {
 			return false, fmt.Errorf("Can't verify miner: %v", err)
 		}
@@ -420,14 +287,14 @@ func (s *Ethereum) ValidateStaker() (bool, error) {
 	return true, nil
 }
 
-func (s *Ethereum) StartStaking(local bool) error {
-	eb, err := s.Etherbase()
+func (s *TomoChain) StartStaking(local bool) error {
+	eb, err := s.GetEtherbase()
 	if err != nil {
 		log.Error("Cannot start mining without etherbase", "err", err)
 		return fmt.Errorf("etherbase missing: %v", err)
 	}
-	if clique, ok := s.engine.(*clique.Clique); ok {
-		wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
+	if clique, ok := s.Engine.(*clique.Clique); ok {
+		wallet, err := s.AccountManager.Find(accounts.Account{Address: eb})
 		if wallet == nil || err != nil {
 			log.Error("Etherbase account unavailable locally", "err", err)
 			return fmt.Errorf("signer missing: %v", err)
@@ -439,85 +306,36 @@ func (s *Ethereum) StartStaking(local bool) error {
 		// mechanism introduced to speed sync times. CPU mining on mainnet is ludicrous
 		// so noone will ever hit this path, whereas marking sync done on CPU mining
 		// will ensure that private networks work in single miner mode too.
-		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
+		atomic.StoreUint32(&s.ProtocolManager.AcceptTxs, 1)
 	}
-	go s.miner.Start(eb)
-	return nil
-}
-
-func (s *Ethereum) StopMining()         { s.miner.Stop() }
-func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
-func (s *Ethereum) Miner() *miner.Miner { return s.miner }
-
-func (s *Ethereum) AccountManager() *accounts.Manager  { return s.accountManager }
-func (s *Ethereum) BlockChain() *core.BlockChain       { return s.blockchain }
-func (s *Ethereum) TxPool() *core.TxPool               { return s.txPool }
-func (s *Ethereum) EventMux() *event.TypeMux           { return s.eventMux }
-func (s *Ethereum) Engine() consensus.Engine           { return s.engine }
-func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }
-func (s *Ethereum) IsListening() bool                  { return true } // Always listening
-func (s *Ethereum) EthVersion() int                    { return int(s.protocolManager.SubProtocols[0].Version) }
-func (s *Ethereum) NetVersion() uint64                 { return s.networkId }
-func (s *Ethereum) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
-
-// Protocols implements node.Service, returning all the currently configured
-// network protocols to start.
-func (s *Ethereum) Protocols() []p2p.Protocol {
-	if s.lesServer == nil {
-		return s.protocolManager.SubProtocols
-	}
-	return append(s.protocolManager.SubProtocols, s.lesServer.Protocols()...)
-}
-
-// Start implements node.Service, starting all internal goroutines needed by the
-// Ethereum protocol implementation.
-func (s *Ethereum) Start(srvr *p2p.Server) error {
-	// Start the bloom bits servicing goroutines
-	s.startBloomHandlers()
-
-	// Start the RPC service
-	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.NetVersion())
-
-	// Figure out a max peers count based on the server limits
-	maxPeers := srvr.MaxPeers
-	if s.config.LightServ > 0 {
-		if s.config.LightPeers >= srvr.MaxPeers {
-			return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", s.config.LightPeers, srvr.MaxPeers)
-		}
-		maxPeers -= s.config.LightPeers
-	}
-	// Start the networking layer and the light server if requested
-	s.protocolManager.Start(maxPeers)
-	if s.lesServer != nil {
-		s.lesServer.Start(srvr)
-	}
+	go s.Miner.Start(eb)
 	return nil
 }
 
 // Stop implements node.Service, terminating all internal goroutines used by the
-// Ethereum protocol.
-func (s *Ethereum) Stop() error {
+// TomoChain protocol.
+func (s *TomoChain) Stop() error {
 	if s.stopDbUpgrade != nil {
 		s.stopDbUpgrade()
 	}
-	s.bloomIndexer.Close()
-	s.blockchain.Stop()
-	s.protocolManager.Stop()
-	if s.lesServer != nil {
-		s.lesServer.Stop()
+	s.BloomIndexer.Close()
+	s.Blockchain.Stop()
+	s.ProtocolManager.Stop()
+	if s.LesServer != nil {
+		s.LesServer.Stop()
 	}
-	s.txPool.Stop()
-	s.miner.Stop()
-	s.eventMux.Stop()
+	s.TxPool.Stop()
+	s.Miner.Stop()
+	s.EventMux.Stop()
 
-	s.chainDb.Close()
-	close(s.shutdownChan)
+	s.ChainDb.Close()
+	close(s.ShutdownChan)
 
 	return nil
 }
 
 // Get current IPC Client.
-func (s *Ethereum) GetClient() (*ethclient.Client, error) {
+func (s *TomoChain) GetClient() (*ethclient.Client, error) {
 	if s.Client == nil {
 		// Inject ipc client global instance.
 		client, err := ethclient.Dial(s.IPCEndpoint)
@@ -527,6 +345,5 @@ func (s *Ethereum) GetClient() (*ethclient.Client, error) {
 		}
 		s.Client = client
 	}
-
 	return s.Client, nil
 }

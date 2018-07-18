@@ -26,9 +26,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/misc"
-	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -141,7 +139,7 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 		chainDb:        eth.ChainDb(),
 		recv:           make(chan *Result, resultQueueSize),
 		chain:          eth.BlockChain(),
-		proc:           eth.BlockChain().Validator(),
+		proc:           eth.BlockChain().GetValidator(),
 		possibleUncles: make(map[common.Hash]*types.Block),
 		coinbase:       coinbase,
 		agents:         make(map[Agent]struct{}),
@@ -254,13 +252,13 @@ func (self *worker) update() {
 		case <-self.chainHeadCh:
 			self.commitNewWork()
 
-			// Handle ChainSideEvent
+		// Handle ChainSideEvent
 		case ev := <-self.chainSideCh:
 			self.uncleMu.Lock()
 			self.possibleUncles[ev.Block.Hash()] = ev.Block
 			self.uncleMu.Unlock()
 
-			// Handle TxPreEvent
+		// Handle TxPreEvent
 		case ev := <-self.txCh:
 			// Apply transaction to the pending state if we're not mining
 			if atomic.LoadInt32(&self.mining) == 0 {
@@ -278,7 +276,7 @@ func (self *worker) update() {
 				}
 			}
 
-			// System stopped
+		// System stopped
 		case <-self.txSub.Err():
 			return
 		case <-self.chainHeadSub.Err():
@@ -339,23 +337,6 @@ func (self *worker) wait() {
 			if mustCommitNewWork {
 				self.commitNewWork()
 			}
-
-			if self.config.Clique != nil {
-				c := self.engine.(*clique.Clique)
-				snap, err := c.GetSnapshot(self.chain, block.Header())
-				if err != nil {
-					log.Error("Fail to get snapshot for sign tx signer.")
-					return
-				}
-				if _, authorized := snap.Signers[self.coinbase]; !authorized {
-					log.Error("Coinbase address not in snapshot signers.")
-					return
-				}
-				// Send tx sign to smart contract blockSigners.
-				if err := contracts.CreateTransactionSign(self.config, self.eth.TxPool(), self.eth.AccountManager(), block); err != nil {
-					log.Error("Fail to create tx sign for signer", "error", "err")
-				}
-			}
 		}
 	}
 }
@@ -414,30 +395,7 @@ func (self *worker) commitNewWork() {
 	defer self.currentMu.Unlock()
 
 	tstart := time.Now()
-	parent := self.chain.CurrentBlock()
-
-	// Only try to commit new work if we are mining
-	if atomic.LoadInt32(&self.mining) == 1 {
-		// check if we are right after parent's coinbase in the list
-		// only go with Clique
-		if self.config.Clique != nil {
-			c := self.engine.(*clique.Clique)
-			snap, err := c.GetSnapshot(self.chain, parent.Header())
-			if err != nil {
-				log.Error("Failed when trying to commit new work", "err", err)
-				return
-			}
-			ok, err := clique.YourTurn(snap, parent.Header(), self.coinbase)
-			if err != nil {
-				log.Error("Failed when trying to commit new work", "err", err)
-				return
-			}
-			if !ok {
-				log.Info("Not our turn to commit block. Wait for next time")
-				return
-			}
-		}
-	}
+	parent := self.chain.GetCurrentBlock()
 
 	tstamp := tstart.Unix()
 	if parent.Time().Cmp(new(big.Int).SetInt64(tstamp)) >= 0 {
@@ -490,7 +448,7 @@ func (self *worker) commitNewWork() {
 	if self.config.DAOForkSupport && self.config.DAOForkBlock != nil && self.config.DAOForkBlock.Cmp(header.Number) == 0 {
 		misc.ApplyDAOHardFork(work.state)
 	}
-	pending, err := self.eth.TxPool().Pending()
+	pending, err := self.eth.TxPool().GetPending()
 	if err != nil {
 		log.Error("Failed to fetch pending transactions", "err", err)
 		return
@@ -529,9 +487,6 @@ func (self *worker) commitNewWork() {
 	if atomic.LoadInt32(&self.mining) == 1 {
 		log.Info("Commit new mining work", "number", work.Block.Number(), "txs", work.tcount, "uncles", len(uncles), "elapsed", common.PrettyDuration(time.Since(tstart)))
 		self.unconfirmed.Shift(work.Block.NumberU64() - 1)
-	}
-	if (work.config.Clique != nil) && (work.Block.NumberU64()%work.config.Clique.Epoch) == 0 {
-		core.Checkpoint <- 1
 	}
 	self.push(work)
 }
