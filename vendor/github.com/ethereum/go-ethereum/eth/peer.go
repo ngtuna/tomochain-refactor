@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	errClosed            = errors.New("Peer set is closed")
+	errClosed            = errors.New("Peer set is Closed")
 	errAlreadyRegistered = errors.New("Peer is already registered")
 	errNotRegistered     = errors.New("Peer is not registered")
 )
@@ -67,7 +67,7 @@ type Peer struct {
 	KnownBlocks *set.Set // Set of block hashes known to be known by this Peer
 }
 
-func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
+func NewPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	id := p.ID()
 
 	return &Peer{
@@ -297,74 +297,74 @@ func (p *Peer) String() string {
 	)
 }
 
-// peerSet represents the collection of active Peers currently participating in
+// PeerSet represents the collection of active Peers currently participating in
 // the Ethereum sub-protocol.
-type peerSet struct {
-	peers  map[string]*Peer
-	lock   sync.RWMutex
-	closed bool
+type PeerSet struct {
+	Peers  map[string]*Peer
+	Lock   sync.RWMutex
+	Closed bool
 }
 
 // NewPeerSet creates a new Peer set to track the active participants.
-func NewPeerSet() *peerSet {
-	return &peerSet{
-		peers: make(map[string]*Peer),
+func NewPeerSet() *PeerSet {
+	return &PeerSet{
+		Peers: make(map[string]*Peer),
 	}
 }
 
 // Register injects a new Peer into the working set, or returns an error if the
 // Peer is already known.
-func (ps *peerSet) Register(p *Peer) error {
-	ps.lock.Lock()
-	defer ps.lock.Unlock()
+func (ps *PeerSet) Register(p *Peer) error {
+	ps.Lock.Lock()
+	defer ps.Lock.Unlock()
 
-	if ps.closed {
+	if ps.Closed {
 		return errClosed
 	}
-	if _, ok := ps.peers[p.Id]; ok {
+	if _, ok := ps.Peers[p.Id]; ok {
 		return errAlreadyRegistered
 	}
-	ps.peers[p.Id] = p
+	ps.Peers[p.Id] = p
 	return nil
 }
 
 // Unregister removes a remote Peer from the active set, disabling any further
 // actions to/from that particular entity.
-func (ps *peerSet) Unregister(id string) error {
-	ps.lock.Lock()
-	defer ps.lock.Unlock()
+func (ps *PeerSet) Unregister(id string) error {
+	ps.Lock.Lock()
+	defer ps.Lock.Unlock()
 
-	if _, ok := ps.peers[id]; !ok {
+	if _, ok := ps.Peers[id]; !ok {
 		return errNotRegistered
 	}
-	delete(ps.peers, id)
+	delete(ps.Peers, id)
 	return nil
 }
 
 // Peer retrieves the registered Peer with the given Id.
-func (ps *peerSet) Peer(id string) *Peer {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
+func (ps *PeerSet) Peer(id string) *Peer {
+	ps.Lock.RLock()
+	defer ps.Lock.RUnlock()
 
-	return ps.peers[id]
+	return ps.Peers[id]
 }
 
 // Len returns if the current number of Peers in the set.
-func (ps *peerSet) Len() int {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
+func (ps *PeerSet) Len() int {
+	ps.Lock.RLock()
+	defer ps.Lock.RUnlock()
 
-	return len(ps.peers)
+	return len(ps.Peers)
 }
 
 // PeersWithoutBlock retrieves a list of Peers that do not have a given block in
 // their set of known hashes.
-func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*Peer {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
+func (ps *PeerSet) PeersWithoutBlock(hash common.Hash) []*Peer {
+	ps.Lock.RLock()
+	defer ps.Lock.RUnlock()
 
-	list := make([]*Peer, 0, len(ps.peers))
-	for _, p := range ps.peers {
+	list := make([]*Peer, 0, len(ps.Peers))
+	for _, p := range ps.Peers {
 		if !p.KnownBlocks.Has(hash) {
 			list = append(list, p)
 		}
@@ -374,12 +374,12 @@ func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*Peer {
 
 // PeersWithoutTx retrieves a list of Peers that do not have a given transaction
 // in their set of known hashes.
-func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*Peer {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
+func (ps *PeerSet) PeersWithoutTx(hash common.Hash) []*Peer {
+	ps.Lock.RLock()
+	defer ps.Lock.RUnlock()
 
-	list := make([]*Peer, 0, len(ps.peers))
-	for _, p := range ps.peers {
+	list := make([]*Peer, 0, len(ps.Peers))
+	for _, p := range ps.Peers {
 		if !p.KnownTxs.Has(hash) {
 			list = append(list, p)
 		}
@@ -388,15 +388,15 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*Peer {
 }
 
 // BestPeer retrieves the known Peer with the currently highest total difficulty.
-func (ps *peerSet) BestPeer() *Peer {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
+func (ps *PeerSet) BestPeer() *Peer {
+	ps.Lock.RLock()
+	defer ps.Lock.RUnlock()
 
 	var (
 		bestPeer *Peer
 		bestTd   *big.Int
 	)
-	for _, p := range ps.peers {
+	for _, p := range ps.Peers {
 		if _, td := p.GetHead(); bestPeer == nil || td.Cmp(bestTd) > 0 {
 			bestPeer, bestTd = p, td
 		}
@@ -406,12 +406,12 @@ func (ps *peerSet) BestPeer() *Peer {
 
 // Close disconnects all Peers.
 // No new Peers can be registered after Close has returned.
-func (ps *peerSet) Close() {
-	ps.lock.Lock()
-	defer ps.lock.Unlock()
+func (ps *PeerSet) Close() {
+	ps.Lock.Lock()
+	defer ps.Lock.Unlock()
 
-	for _, p := range ps.peers {
+	for _, p := range ps.Peers {
 		p.Disconnect(p2p.DiscQuitting)
 	}
-	ps.closed = true
+	ps.Closed = true
 }

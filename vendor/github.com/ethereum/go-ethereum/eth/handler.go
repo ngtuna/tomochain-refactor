@@ -76,7 +76,7 @@ type ProtocolManager struct {
 
 	Downloader *downloader.Downloader
 	Fetcher    *fetcher.Fetcher
-	Peers      *peerSet
+	Peers      *PeerSet
 
 	SubProtocols []p2p.Protocol
 
@@ -243,7 +243,7 @@ func (pm *ProtocolManager) Stop() {
 }
 
 func (pm *ProtocolManager) NewPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
-	return newPeer(pv, p, newMeteredMsgWriter(rw))
+	return NewPeer(pv, p, NewMeteredMsgWriter(rw))
 }
 
 // Handle is the callback invoked to manage the life cycle of an eth Peer. When
@@ -742,7 +742,7 @@ func (self *ProtocolManager) txBroadcastLoop() {
 		case event := <-self.TxCh:
 			self.BroadcastTx(event.Tx.Hash(), event.Tx)
 
-		// Err() channel will be closed when unsubscribing.
+		// Err() channel will be Closed when unsubscribing.
 		case <-self.TxSub.Err():
 			return
 		}
