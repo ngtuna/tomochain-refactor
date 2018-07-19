@@ -55,3 +55,7 @@ type CliqueConfig struct {
 	Reward           uint64 `json:"reward"`           // Block reward - unit Ether
 	RewardCheckpoint uint64 `json:"rewardCheckpoint"` // Checkpoint block for calculate rewards.
 }
+
+func (c *ChainConfig) IsEIP158(num *big.Int) bool {
+	return params.IsForked(c.EIP158Block, num)
+}
