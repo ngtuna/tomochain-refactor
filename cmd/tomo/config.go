@@ -25,8 +25,7 @@ import (
 	"reflect"
 	"unicode"
 
-	cli "gopkg.in/urfave/cli.v1"
-
+	"gopkg.in/urfave/cli.v1"
 
 	"github.com/ethereum/go-ethereum/dashboard"
 	"github.com/ethereum/go-ethereum/eth"
@@ -75,15 +74,7 @@ type ethstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
-type tomoConfig struct {
-	Eth       eth.Config
-	Shh       whisper.Config
-	Node      node.Config
-	Ethstats  ethstatsConfig
-	Dashboard dashboard.Config
-}
-
-func loadConfig(file string, cfg *tomoConfig) error {
+func loadConfig(file string, cfg *TomoConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -108,9 +99,9 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-func makeConfigNode(ctx *cli.Context) (*node.Node, tomoConfig) {
+func makeConfigNode(ctx *cli.Context) (*node.Node, TomoConfig) {
 	// Load defaults.
-	cfg := tomoConfig{
+	cfg := TomoConfig{
 		Eth:       eth.DefaultConfig,
 		Shh:       whisper.DefaultConfig,
 		Node:      defaultNodeConfig(),
@@ -123,7 +114,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tomoConfig) {
 			utils.Fatalf("%v", err)
 		}
 	}
-
+	Config = cfg
 	// Apply flags.
 	utils.SetNodeConfig(ctx, &cfg.Node)
 	stack, err := node.New(&cfg.Node)

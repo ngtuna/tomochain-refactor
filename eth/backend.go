@@ -25,7 +25,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/bloombits"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/downloader"
@@ -40,7 +39,6 @@ import (
 	"github.com/tomochain/tomochain/eth/fetcher"
 
 	"github.com/tomochain/tomochain/contracts"
-	tomocommon "github.com/tomochain/tomochain/common"
 	"github.com/tomochain/tomochain/consensus/clique"
 	"github.com/tomochain/tomochain/consensus"
 	"sync/atomic"
@@ -127,7 +125,7 @@ func (s *TomoChain) GetEtherbase() (eb common.Address, err error) {
 // initialisation of the common TomoChain object)
 func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 	if config.SyncMode == downloader.LightSync {
-		return nil, errors.New("can't run tomo.TomoChain in light sync mode, use les.LightEthereum")
+		return nil, errors.New("can't run tomoChain.TomoChain in light sync mode, use les.LightEthereum")
 	}
 	if !config.SyncMode.IsValid() {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
@@ -143,7 +141,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 	engine := eth.CreateConsensusEngine(ctx, &config.Ethash, chainConfig, chainDb)
-	tomo := &TomoChain{
+	tomoChain := &TomoChain{
 		Config:         config,
 		ChainDb:        chainDb,
 		ChainConfig:    chainConfig,
@@ -173,95 +171,95 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}
 	)
-	tomo.Blockchain, err = core.NewBlockChain(chainDb, cacheConfig, tomo.ChainConfig, tomo.Engine.(ethconsensus.Engine), vmConfig)
+	tomoChain.Blockchain, err = core.NewBlockChain(chainDb, cacheConfig, tomoChain.ChainConfig, tomoChain.Engine.(ethconsensus.Engine), vmConfig)
 	if err != nil {
 		return nil, err
 	}
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		tomo.Blockchain.SetHead(compat.RewindTo)
+		tomoChain.Blockchain.SetHead(compat.RewindTo)
 		core.WriteChainConfig(chainDb, genesisHash, chainConfig)
 	}
-	tomo.BloomIndexer.Start(tomo.Blockchain)
+	tomoChain.BloomIndexer.Start(tomoChain.Blockchain)
 
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = ctx.ResolvePath(config.TxPool.Journal)
 	}
-	tomo.TxPool = core.NewTxPool(config.TxPool, tomo.ChainConfig, tomo.Blockchain)
+	tomoChain.TxPool = core.NewTxPool(config.TxPool, tomoChain.ChainConfig, tomoChain.Blockchain)
 
-	if tomo.ProtocolManager, err = NewProtocolManager(tomo.ChainConfig, config.SyncMode, config.NetworkId, tomo.EventMux, tomo.TxPool, tomo.Engine, tomo.Blockchain, chainDb); err != nil {
+	if tomoChain.ProtocolManager, err = NewProtocolManager(tomoChain.ChainConfig, config.SyncMode, config.NetworkId, tomoChain.EventMux, tomoChain.TxPool, tomoChain.Engine, tomoChain.Blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	tomo.Miner = miner.New(tomo, tomo.ChainConfig, tomo.GetEventMux(), tomo.Engine.(ethconsensus.Engine))
-	tomo.Miner.SetExtra(eth.MakeExtraData(config.ExtraData))
+	tomoChain.Miner = miner.New(tomoChain, tomoChain.ChainConfig, tomoChain.GetEventMux(), tomoChain.Engine.(ethconsensus.Engine))
+	tomoChain.Miner.SetExtra(eth.MakeExtraData(config.ExtraData))
 
-	tomo.APIBackend = &EthAPIBackend{tomo, nil}
+	tomoChain.APIBackend = &EthAPIBackend{tomoChain, nil}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.GasPrice
 	}
-	tomo.APIBackend.Gpo = gasprice.NewOracle(tomo.APIBackend, gpoParams)
+	tomoChain.APIBackend.Gpo = gasprice.NewOracle(tomoChain.APIBackend, gpoParams)
 
-	if tomo.ChainConfig.Clique != nil {
-		c := tomo.Engine.(*clique.Clique)
+	if tomoChain.ChainConfig.Clique != nil {
+		c := tomoChain.Engine.(*clique.Clique)
 
 		// Set global ipc endpoint.
-		tomo.IPCEndpoint = ctx.Config.IPCEndpoint()
+		tomoChain.IPCEndpoint = ctx.Config.IPCEndpoint()
 
 		// Inject hook for send tx sign to smartcontract after insert block into chain.
 		importedHook := func(block *types.Block) {
-			snap, err := c.GetSnapshot(tomo.Blockchain, block.Header())
+			snap, err := c.GetSnapshot(tomoChain.Blockchain, block.Header())
 			if err != nil {
 				log.Error("Fail to get snapshot for sign tx validator.")
 				return
 			}
-			if _, authorized := snap.Signers[tomo.Etherbase]; authorized {
-				if err := contracts.CreateTransactionSign(chainConfig, tomo.TxPool, tomo.AccountManager, block); err != nil {
+			if _, authorized := snap.Signers[tomoChain.Etherbase]; authorized {
+				if err := contracts.CreateTransactionSign(chainConfig, tomoChain.TxPool, tomoChain.AccountManager, block); err != nil {
 					log.Error("Fail to create tx sign for imported block", "error", err)
 					return
 				}
 			}
 		}
-		fetcher.SetImportedHook(tomo.ProtocolManager.Fetcher, importedHook)
+		fetcher.SetImportedHook(tomoChain.ProtocolManager.Fetcher, importedHook)
 
 		// Hook reward for clique validator.
-		c.HookReward = func(chain consensus.ChainReader, state *state.StateDB, header *types.Header) error {
-			client, err := tomo.GetClient()
-			if err != nil {
-				log.Error("Fail to connect IPC client for blockSigner", "error", err)
-
-				return err
-			}
-
-			number := header.Number.Uint64()
-			rCheckpoint := chain.Config().Clique.RewardCheckpoint
-			if number > 0 && number-rCheckpoint > 0 {
-				// Get signers in blockSigner smartcontract.
-				addr := common.HexToAddress(tomocommon.BlockSigners)
-				chainReward := new(big.Int).SetUint64(chain.Config().Clique.Reward * params.Ether)
-				totalSigner := new(uint64)
-				signers, err := contracts.GetRewardForCheckpoint(addr, number, rCheckpoint, client, totalSigner)
-				if err != nil {
-					log.Error("Fail to get signers for reward checkpoint", "error", err)
-				}
-				rewardSigners, err := contracts.CalculateReward(chainReward, signers, *totalSigner)
-				if err != nil {
-					log.Error("Fail to calculate reward for signers", "error", err)
-				}
-				// Add reward for signers.
-				if len(signers) > 0 {
-					for signer, calcReward := range rewardSigners {
-						state.AddBalance(signer, calcReward)
-					}
-				}
-			}
-
-			return nil
-		}
+		//c.HookReward = func(chain consensus.ChainReader, state *state.StateDB, header *types.Header) error {
+		//	client, err := tomoChain.GetClient()
+		//	if err != nil {
+		//		log.Error("Fail to connect IPC client for blockSigner", "error", err)
+		//
+		//		return err
+		//	}
+		//
+		//	number := header.Number.Uint64()
+		//	rCheckpoint := utils.Config.RewardConfig.RewardCheckpoint
+		//	if number > 0 && number-rCheckpoint > 0 {
+		//		// Get signers in blockSigner smartcontract.
+		//		addr := common.HexToAddress(tomocommon.BlockSigners)
+		//		chainReward := new(big.Int).SetUint64(utils.Config.RewardConfig.Reward * params.Ether)
+		//		totalSigner := new(uint64)
+		//		signers, err := contracts.GetRewardForCheckpoint(addr, number, rCheckpoint, client, totalSigner)
+		//		if err != nil {
+		//			log.Error("Fail to get signers for reward checkpoint", "error", err)
+		//		}
+		//		rewardSigners, err := contracts.CalculateReward(chainReward, signers, *totalSigner)
+		//		if err != nil {
+		//			log.Error("Fail to calculate reward for signers", "error", err)
+		//		}
+		//		// Add reward for signers.
+		//		if len(signers) > 0 {
+		//			for signer, calcReward := range rewardSigners {
+		//				state.AddBalance(signer, calcReward)
+		//			}
+		//		}
+		//	}
+		//
+		//	return nil
+		//}
 	}
 
-	return tomo, nil
+	return tomoChain, nil
 }
 
 // ValidateMiner checks if node's address is in set of validators

@@ -345,12 +345,6 @@
 			"revisionTime": "2018-03-28T12:35:41Z"
 		},
 		{
-			"checksumSHA1": "LS/Qn4CAVXw3zDAiURIS9LIvKxg=",
-			"path": "github.com/ethereum/go-ethereum/crypto/secp256k1",
-			"revision": "a095b84ec5a35cb3432380cc677d4e244b4a137f",
-			"revisionTime": "2018-03-28T12:35:41Z"
-		},
-		{
 			"checksumSHA1": "pQzUVRi0z/3Z4FpRyExSg1ROLSA=",
 			"path": "github.com/ethereum/go-ethereum/crypto/sha3",
 			"revision": "a095b84ec5a35cb3432380cc677d4e244b4a137f",
@@ -1304,12 +1298,6 @@
 			"path": "gopkg.in/natefinch/npipe.v2",
 			"revision": "c1b8fa8bdccecb0b8db834ee0b92fdbcfa606dd6",
 			"revisionTime": "2016-06-21T03:49:01Z"
-		},
-		{
-			"checksumSHA1": "vndxs5Tv09/8S+Dr2PBAiM557lI=",
-			"path": "gopkg.in/olebedev/go-duktape.v3",
-			"revision": "abf0ba0be5d5d36b1f9266463cc320b9a5ab224e",
-			"revisionTime": "2018-03-02T12:15:09Z"
 		},
 		{
 			"checksumSHA1": "4BwmmgQUhWtizsR2soXND0nqZ1I=",

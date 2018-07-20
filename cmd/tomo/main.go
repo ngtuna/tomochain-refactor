@@ -30,7 +30,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/console"
 
-
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -43,6 +42,10 @@ import (
 
 	"github.com/tomochain/tomochain/eth"
 	"github.com/tomochain/tomochain/core"
+	"github.com/ethereum/go-ethereum/dashboard"
+	ethEthereum "github.com/ethereum/go-ethereum/eth"
+	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	tomoParams "github.com/tomochain/tomochain/params"
 )
 
 const (
@@ -208,6 +211,23 @@ func init() {
 		return nil
 	}
 }
+
+
+
+type EthstatsConfig struct {
+	URL string `toml:",omitempty"`
+}
+
+type TomoConfig struct {
+	Eth          ethEthereum.Config
+	Shh          whisper.Config
+	Node         node.Config
+	Ethstats     EthstatsConfig
+	Dashboard    dashboard.Config
+	RewardConfig tomoParams.RewardConfig
+}
+
+var Config TomoConfig
 
 func main() {
 	if err := app.Run(os.Args); err != nil {

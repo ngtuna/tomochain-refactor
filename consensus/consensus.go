@@ -25,7 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"math/big"
 
-	"github.com/tomochain/tomochain/params"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // ChainReader defines a small collection of methods needed to access the local

@@ -293,7 +293,7 @@ func ambiguousAddrRecovery(ks *keystore.KeyStore, err *keystore.AmbiguousAddrErr
 
 // accountCreate creates a new account into the keystore defined by the CLI flags.
 func accountCreate(ctx *cli.Context) error {
-	cfg := tomoConfig{Node: defaultNodeConfig()}
+	cfg := TomoConfig{Node: defaultNodeConfig()}
 	// Load config file.
 	if file := ctx.GlobalString(configFileFlag.Name); file != "" {
 		if err := loadConfig(file, &cfg); err != nil {
