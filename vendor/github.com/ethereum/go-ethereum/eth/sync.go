@@ -29,17 +29,17 @@ import (
 )
 
 const (
-	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few Peers are available
-	minDesiredPeerCount = 5                // Amount of Peers desired to start syncing
+	ForceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few Peers are available
+	MinDesiredPeerCount = 5                // Amount of Peers desired to start syncing
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
-	txsyncPackSize = 100 * 1024
+	TxsyncPackSize = 100 * 1024
 )
 
 type Txsync struct {
-	p   *Peer
-	txs []*types.Transaction
+	P   *Peer
+	Txs []*types.Transaction
 }
 
 // syncTransactions starts sending all currently pending transactions to the given Peer.
@@ -74,21 +74,21 @@ func (pm *ProtocolManager) txsyncLoop() {
 	send := func(s *Txsync) {
 		// Fill pack with transactions up to the target size.
 		size := common.StorageSize(0)
-		pack.p = s.p
-		pack.txs = pack.txs[:0]
-		for i := 0; i < len(s.txs) && size < txsyncPackSize; i++ {
-			pack.txs = append(pack.txs, s.txs[i])
-			size += s.txs[i].Size()
+		pack.P = s.P
+		pack.Txs = pack.Txs[:0]
+		for i := 0; i < len(s.Txs) && size < TxsyncPackSize; i++ {
+			pack.Txs = append(pack.Txs, s.Txs[i])
+			size += s.Txs[i].Size()
 		}
 		// Remove the transactions that will be sent.
-		s.txs = s.txs[:copy(s.txs, s.txs[len(pack.txs):])]
-		if len(s.txs) == 0 {
-			delete(pending, s.p.ID())
+		s.Txs = s.Txs[:copy(s.Txs, s.Txs[len(pack.Txs):])]
+		if len(s.Txs) == 0 {
+			delete(pending, s.P.ID())
 		}
 		// Send the pack in the background.
-		s.p.Log().Trace("Sending batch of transactions", "count", len(pack.txs), "bytes", size)
+		s.P.Log().Trace("Sending batch of transactions", "count", len(pack.Txs), "bytes", size)
 		sending = true
-		go func() { done <- pack.p.SendTransactions(pack.txs) }()
+		go func() { done <- pack.P.SendTransactions(pack.Txs) }()
 	}
 
 	// pick chooses the next pending sync.
@@ -108,7 +108,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 	for {
 		select {
 		case s := <-pm.TxsyncCh:
-			pending[s.p.ID()] = s
+			pending[s.P.ID()] = s
 			if !sending {
 				send(s)
 			}
@@ -116,8 +116,8 @@ func (pm *ProtocolManager) txsyncLoop() {
 			sending = false
 			// Stop tracking Peers that cause send failures.
 			if err != nil {
-				pack.p.Log().Debug("Transaction send failed", "err", err)
-				delete(pending, pack.p.ID())
+				pack.P.Log().Debug("Transaction send failed", "err", err)
+				delete(pending, pack.P.ID())
 			}
 			// Schedule the next send.
 			if s := pick(); s != nil {
@@ -138,14 +138,14 @@ func (pm *ProtocolManager) syncer() {
 	defer pm.Downloader.Terminate()
 
 	// Wait for different events to fire synchronisation operations
-	forceSync := time.NewTicker(forceSyncCycle)
+	forceSync := time.NewTicker(ForceSyncCycle)
 	defer forceSync.Stop()
 
 	for {
 		select {
 		case <-pm.NewPeerCh:
 			// Make sure we have Peers to select from, then sync
-			if pm.Peers.Len() < minDesiredPeerCount {
+			if pm.Peers.Len() < MinDesiredPeerCount {
 				break
 			}
 			go pm.Synchronise(pm.Peers.BestPeer())
@@ -160,7 +160,7 @@ func (pm *ProtocolManager) syncer() {
 	}
 }
 
-// Synchronise tries to sync up our local block chain with a remote Peer.
+// Synchronise tries to sync up our local Block chain with a remote Peer.
 func (pm *ProtocolManager) Synchronise(peer *Peer) {
 	// Short circuit if no Peers are available
 	if peer == nil {
@@ -180,10 +180,10 @@ func (pm *ProtocolManager) Synchronise(peer *Peer) {
 		// Fast sync was explicitly requested, and explicitly granted
 		mode = downloader.FastSync
 	} else if currentBlock.NumberU64() == 0 && pm.Blockchain.GetCurrentFastBlock().NumberU64() > 0 {
-		// The database seems empty as the current block is the genesis. Yet the fast
-		// block is ahead, so fast sync was enabled for this node at a certain point.
+		// The database seems empty as the current Block is the genesis. Yet the fast
+		// Block is ahead, so fast sync was enabled for this node at a certain point.
 		// The only scenario where this can happen is if the user manually (or via a
-		// bad block) rolled back a fast sync node below the sync point. In this case
+		// bad Block) rolled back a fast sync node below the sync point. In this case
 		// however it's safe to reenable fast sync.
 		atomic.StoreUint32(&pm.FastSync, 1)
 		mode = downloader.FastSync
@@ -196,7 +196,7 @@ func (pm *ProtocolManager) Synchronise(peer *Peer) {
 		}
 	}
 
-	// Run the sync cycle, and disable fast sync if we've went past the pivot block
+	// Run the sync cycle, and disable fast sync if we've went past the pivot Block
 	if err := pm.Downloader.Synchronise(peer.Id, pHead, pTd, mode); err != nil {
 		return
 	}
@@ -208,7 +208,7 @@ func (pm *ProtocolManager) Synchronise(peer *Peer) {
 	if head := pm.Blockchain.GetCurrentBlock(); head.NumberU64() > 0 {
 		// We've completed a sync cycle, notify all Peers of new state. This path is
 		// essential in star-topology networks where a gateway node needs to notify
-		// all its out-of-date Peers of the availability of a new block. This failure
+		// all its out-of-date Peers of the availability of a new Block. This failure
 		// scenario will most often crop up in private and hackathon networks with
 		// degenerate connectivity, but it should be healthy for the mainnet too to
 		// more reliably update Peers or the local TD state.

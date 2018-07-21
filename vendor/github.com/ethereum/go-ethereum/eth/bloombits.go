@@ -83,18 +83,18 @@ const (
 	// considered probably final and its rotated bits are calculated.
 	bloomConfirms = 256
 
-	// bloomThrottling is the time to wait between processing two consecutive index
+	// bloomThrottling is the time to wait between processing two consecutive Index
 	// sections. It's useful during chain upgrades to prevent disk overload.
 	bloomThrottling = 100 * time.Millisecond
 )
 
-// BloomIndexer implements a core.ChainIndexer, building up a rotated bloom bits index
+// BloomIndexer implements a core.ChainIndexer, building up a rotated bloom bits Index
 // for the Ethereum header bloom filters, permitting blazing fast filtering.
 type BloomIndexer struct {
 	size uint64 // section size to generate bloombits for
 
-	db  ethdb.Database       // database instance to write index data and metadata into
-	gen *bloombits.Generator // generator to rotate the bloom bits crating the bloom index
+	db  ethdb.Database       // database instance to write Index data and metadata into
+	gen *bloombits.Generator // generator to rotate the bloom bits crating the bloom Index
 
 	section uint64      // Section is the section number being processed currently
 	head    common.Hash // GetHead is the hash of the last header processed
@@ -112,7 +112,7 @@ func NewBloomIndexer(db ethdb.Database, size uint64) *core.ChainIndexer {
 	return core.NewChainIndexer(db, table, backend, size, bloomConfirms, bloomThrottling, "bloombits")
 }
 
-// Reset implements core.ChainIndexerBackend, starting a new bloombits index
+// Reset implements core.ChainIndexerBackend, starting a new bloombits Index
 // section.
 func (b *BloomIndexer) Reset(section uint64, lastSectionHead common.Hash) error {
 	gen, err := bloombits.NewGenerator(uint(b.size))
@@ -121,7 +121,7 @@ func (b *BloomIndexer) Reset(section uint64, lastSectionHead common.Hash) error 
 }
 
 // Process implements core.ChainIndexerBackend, adding a new header's bloom into
-// the index.
+// the Index.
 func (b *BloomIndexer) Process(header *types.Header) {
 	b.gen.AddBloom(uint(header.Number.Uint64()-b.section*b.size), header.Bloom)
 	b.head = header.Hash()

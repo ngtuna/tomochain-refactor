@@ -41,7 +41,7 @@ type requestDistributor struct {
 	lock             sync.Mutex
 }
 
-// distPeer is an LES server peer interface for the request distributor.
+// distPeer is an LES Server peer interface for the request distributor.
 // waitBefore returns either the necessary waiting time before sending a request
 // with the given upper estimated cost or the estimated remaining relative buffer
 // value after sending such a request (in which case the request can be sent
@@ -55,7 +55,7 @@ type distPeer interface {
 // distReq is the request abstraction used by the distributor. It is based on
 // three callback functions:
 // - getCost returns the upper estimate of the cost of sending the request to a given peer
-// - canSend tells if the server peer is suitable to serve the request
+// - canSend tells if the Server peer is suitable to serve the request
 // - request prepares sending the request to the given peer and returns a function that
 // does the actual sending. Request order should be preserved but the callback itself should not
 // block until it is sent because other peers might still be able to receive requests while

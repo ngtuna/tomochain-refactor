@@ -37,108 +37,108 @@ import (
 )
 
 type LesServer struct {
-	config          *eth.Config
-	protocolManager *ProtocolManager
-	fcManager       *flowcontrol.ClientManager // nil if our node is client only
-	fcCostStats     *requestCostStats
-	defParams       *flowcontrol.ServerParams
-	lesTopics       []discv5.Topic
-	privateKey      *ecdsa.PrivateKey
-	quitSync        chan struct{}
+	Config          *eth.Config
+	ProtocolManager *ProtocolManager
+	FcManager       *flowcontrol.ClientManager // nil if our node is client only
+	FcCostStats     *requestCostStats
+	DefParams       *flowcontrol.ServerParams
+	LesTopics       []discv5.Topic
+	PrivateKey      *ecdsa.PrivateKey
+	QuitSync        chan struct{}
 
-	chtIndexer, bloomTrieIndexer *core.ChainIndexer
+	ChtIndexer, BloomTrieIndexer *core.ChainIndexer
 }
 
 func NewLesServer(eth *eth.Ethereum, config *eth.Config) (*LesServer, error) {
 	quitSync := make(chan struct{})
-	pm, err := NewProtocolManager(eth.BlockChain().Config(), false, ServerProtocolVersions, config.NetworkId, eth.GetEventMux(), eth.GetEngine(), newPeerSet(), eth.BlockChain(), eth.GetTxPool(), eth.GetChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
+	pm, err := NewProtocolManager(eth.BlockChain().Config(), false, ServerProtocolVersions, config.NetworkId, eth.GetEventMux(), eth.GetEngine(), NewPeerSet(), eth.BlockChain(), eth.GetTxPool(), eth.GetChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
 	if err != nil {
 		return nil, err
 	}
 
 	lesTopics := make([]discv5.Topic, len(AdvertiseProtocolVersions))
 	for i, pv := range AdvertiseProtocolVersions {
-		lesTopics[i] = lesTopic(eth.BlockChain().Genesis().Hash(), pv)
+		lesTopics[i] = LesTopic(eth.BlockChain().Genesis().Hash(), pv)
 	}
 
 	srv := &LesServer{
-		config:           config,
-		protocolManager:  pm,
-		quitSync:         quitSync,
-		lesTopics:        lesTopics,
-		chtIndexer:       light.NewChtIndexer(eth.GetChainDb(), false),
-		bloomTrieIndexer: light.NewBloomTrieIndexer(eth.GetChainDb(), false),
+		Config:           config,
+		ProtocolManager:  pm,
+		QuitSync:         quitSync,
+		LesTopics:        lesTopics,
+		ChtIndexer:       light.NewChtIndexer(eth.GetChainDb(), false),
+		BloomTrieIndexer: light.NewBloomTrieIndexer(eth.GetChainDb(), false),
 	}
 	logger := log.New()
 
-	chtV1SectionCount, _, _ := srv.chtIndexer.Sections() // indexer still uses LES/1 4k section size for backwards server compatibility
+	chtV1SectionCount, _, _ := srv.ChtIndexer.Sections() // indexer still uses LES/1 4k section size for backwards Server compatibility
 	chtV2SectionCount := chtV1SectionCount / (light.CHTFrequencyClient / light.CHTFrequencyServer)
 	if chtV2SectionCount != 0 {
 		// convert to LES/2 section
 		chtLastSection := chtV2SectionCount - 1
-		// convert last LES/2 section index back to LES/1 index for chtIndexer.SectionHead
+		// convert last LES/2 section index back to LES/1 index for ChtIndexer.SectionHead
 		chtLastSectionV1 := (chtLastSection+1)*(light.CHTFrequencyClient/light.CHTFrequencyServer) - 1
-		chtSectionHead := srv.chtIndexer.SectionHead(chtLastSectionV1)
-		chtRoot := light.GetChtV2Root(pm.chainDb, chtLastSection, chtSectionHead)
+		chtSectionHead := srv.ChtIndexer.SectionHead(chtLastSectionV1)
+		chtRoot := light.GetChtV2Root(pm.ChainDb, chtLastSection, chtSectionHead)
 		logger.Info("Loaded CHT", "section", chtLastSection, "head", chtSectionHead, "root", chtRoot)
 	}
-	bloomTrieSectionCount, _, _ := srv.bloomTrieIndexer.Sections()
+	bloomTrieSectionCount, _, _ := srv.BloomTrieIndexer.Sections()
 	if bloomTrieSectionCount != 0 {
 		bloomTrieLastSection := bloomTrieSectionCount - 1
-		bloomTrieSectionHead := srv.bloomTrieIndexer.SectionHead(bloomTrieLastSection)
-		bloomTrieRoot := light.GetBloomTrieRoot(pm.chainDb, bloomTrieLastSection, bloomTrieSectionHead)
+		bloomTrieSectionHead := srv.BloomTrieIndexer.SectionHead(bloomTrieLastSection)
+		bloomTrieRoot := light.GetBloomTrieRoot(pm.ChainDb, bloomTrieLastSection, bloomTrieSectionHead)
 		logger.Info("Loaded bloom trie", "section", bloomTrieLastSection, "head", bloomTrieSectionHead, "root", bloomTrieRoot)
 	}
 
-	srv.chtIndexer.Start(eth.BlockChain())
-	pm.server = srv
+	srv.ChtIndexer.Start(eth.BlockChain())
+	pm.Server = srv
 
-	srv.defParams = &flowcontrol.ServerParams{
+	srv.DefParams = &flowcontrol.ServerParams{
 		BufLimit:    300000000,
 		MinRecharge: 50000,
 	}
-	srv.fcManager = flowcontrol.NewClientManager(uint64(config.LightServ), 10, 1000000000)
-	srv.fcCostStats = newCostStats(eth.GetChainDb())
+	srv.FcManager = flowcontrol.NewClientManager(uint64(config.LightServ), 10, 1000000000)
+	srv.FcCostStats = NewCostStats(eth.GetChainDb())
 	return srv, nil
 }
 
 func (s *LesServer) Protocols() []p2p.Protocol {
-	return s.protocolManager.SubProtocols
+	return s.ProtocolManager.SubProtocols
 }
 
-// Start starts the LES server
+// Start starts the LES Server
 func (s *LesServer) Start(srvr *p2p.Server) {
-	s.protocolManager.Start(s.config.LightPeers)
+	s.ProtocolManager.Start(s.Config.LightPeers)
 	if srvr.DiscV5 != nil {
-		for _, topic := range s.lesTopics {
+		for _, topic := range s.LesTopics {
 			topic := topic
 			go func() {
 				logger := log.New("topic", topic)
 				logger.Info("Starting topic registration")
 				defer logger.Info("Terminated topic registration")
 
-				srvr.DiscV5.RegisterTopic(topic, s.quitSync)
+				srvr.DiscV5.RegisterTopic(topic, s.QuitSync)
 			}()
 		}
 	}
-	s.privateKey = srvr.PrivateKey
-	s.protocolManager.blockLoop()
+	s.PrivateKey = srvr.PrivateKey
+	s.ProtocolManager.blockLoop()
 }
 
 func (s *LesServer) SetBloomBitsIndexer(bloomIndexer *core.ChainIndexer) {
-	bloomIndexer.AddChildIndexer(s.bloomTrieIndexer)
+	bloomIndexer.AddChildIndexer(s.BloomTrieIndexer)
 }
 
 // Stop stops the LES service
 func (s *LesServer) Stop() {
-	s.chtIndexer.Close()
+	s.ChtIndexer.Close()
 	// bloom trie indexer is closed by parent bloombits indexer
-	s.fcCostStats.store()
-	s.fcManager.Stop()
+	s.FcCostStats.store()
+	s.FcManager.Stop()
 	go func() {
-		<-s.protocolManager.noMorePeers
+		<-s.ProtocolManager.noMorePeers
 	}()
-	s.protocolManager.Stop()
+	s.ProtocolManager.Stop()
 }
 
 type requestCosts struct {
@@ -235,7 +235,7 @@ type requestCostStatsRlp []struct {
 
 var rcStatsKey = []byte("_requestCostStats")
 
-func newCostStats(db ethdb.Database) *requestCostStats {
+func NewCostStats(db ethdb.Database) *requestCostStats {
 	stats := make(map[uint64]*linReg)
 	for _, code := range reqList {
 		stats[code] = &linReg{cnt: 100}
@@ -329,11 +329,11 @@ func (pm *ProtocolManager) blockLoop() {
 					header := ev.Block.Header()
 					hash := header.Hash()
 					number := header.Number.Uint64()
-					td := core.GetTd(pm.chainDb, hash, number)
+					td := core.GetTd(pm.ChainDb, hash, number)
 					if td != nil && td.Cmp(lastBroadcastTd) > 0 {
 						var reorg uint64
 						if lastHead != nil {
-							reorg = lastHead.Number.Uint64() - core.FindCommonAncestor(pm.chainDb, header, lastHead).Number.Uint64()
+							reorg = lastHead.Number.Uint64() - core.FindCommonAncestor(pm.ChainDb, header, lastHead).Number.Uint64()
 						}
 						lastHead = header
 						lastBroadcastTd = td
@@ -359,7 +359,7 @@ func (pm *ProtocolManager) blockLoop() {
 							case announceTypeSigned:
 								if !signed {
 									signedAnnounce = announce
-									signedAnnounce.sign(pm.server.privateKey)
+									signedAnnounce.sign(pm.Server.PrivateKey)
 									signed = true
 								}
 

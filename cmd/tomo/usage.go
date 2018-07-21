@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/tomochain/tomochain/internal/debug"
+	//"github.com/tomochain/tomochain/internal/debug"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -209,7 +209,9 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.MetricsEnabledFlag,
 			utils.FakePoWFlag,
 			utils.NoCompactionFlag,
-		}, debug.Flags...),
+		},
+		//debug.Flags...
+		),
 	},
 	{
 		Name:  "WHISPER (EXPERIMENTAL)",

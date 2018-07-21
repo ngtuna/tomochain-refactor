@@ -56,29 +56,29 @@ var (
 	miscOutTrafficMeter       = metrics.NewRegisteredMeter("eth/misc/out/traffic", nil)
 )
 
-// meteredMsgReadWriter is a wrapper around a p2p.MsgReadWriter, capable of
+// MeteredMsgReadWriter is a wrapper around a p2p.MsgReadWriter, capable of
 // accumulating the above defined metrics based on the data stream contents.
-type meteredMsgReadWriter struct {
-	p2p.MsgReadWriter     // Wrapped message stream to meter
-	version           int // Protocol Version to select correct meters
+type MeteredMsgReadWriter struct {
+	p2p.MsgReadWriter // Wrapped message stream to meter
+	Version int       // Protocol Version to select correct meters
 }
 
-// newMeteredMsgWriter wraps a p2p MsgReadWriter with metering support. If the
+// NewMeteredMsgWriter wraps a p2p MsgReadWriter with metering support. If the
 // metrics system is disabled, this function returns the original object.
-func newMeteredMsgWriter(rw p2p.MsgReadWriter) p2p.MsgReadWriter {
+func NewMeteredMsgWriter(rw p2p.MsgReadWriter) p2p.MsgReadWriter {
 	if !metrics.Enabled {
 		return rw
 	}
-	return &meteredMsgReadWriter{MsgReadWriter: rw}
+	return &MeteredMsgReadWriter{MsgReadWriter: rw}
 }
 
 // Init sets the protocol Version used by the stream to know which meters to
 // increment in case of overlapping message ids between protocol versions.
-func (rw *meteredMsgReadWriter) Init(version int) {
-	rw.version = version
+func (rw *MeteredMsgReadWriter) Init(version int) {
+	rw.Version = version
 }
 
-func (rw *meteredMsgReadWriter) ReadMsg() (p2p.Msg, error) {
+func (rw *MeteredMsgReadWriter) ReadMsg() (p2p.Msg, error) {
 	// Read the message and short circuit in case of an error
 	msg, err := rw.MsgReadWriter.ReadMsg()
 	if err != nil {
@@ -92,9 +92,9 @@ func (rw *meteredMsgReadWriter) ReadMsg() (p2p.Msg, error) {
 	case msg.Code == BlockBodiesMsg:
 		packets, traffic = reqBodyInPacketsMeter, reqBodyInTrafficMeter
 
-	case rw.version >= Eth63 && msg.Code == NodeDataMsg:
+	case rw.Version >= Eth63 && msg.Code == NodeDataMsg:
 		packets, traffic = reqStateInPacketsMeter, reqStateInTrafficMeter
-	case rw.version >= Eth63 && msg.Code == ReceiptsMsg:
+	case rw.Version >= Eth63 && msg.Code == ReceiptsMsg:
 		packets, traffic = reqReceiptInPacketsMeter, reqReceiptInTrafficMeter
 
 	case msg.Code == NewBlockHashesMsg:
@@ -110,7 +110,7 @@ func (rw *meteredMsgReadWriter) ReadMsg() (p2p.Msg, error) {
 	return msg, err
 }
 
-func (rw *meteredMsgReadWriter) WriteMsg(msg p2p.Msg) error {
+func (rw *MeteredMsgReadWriter) WriteMsg(msg p2p.Msg) error {
 	// Account for the data traffic
 	packets, traffic := miscOutPacketsMeter, miscOutTrafficMeter
 	switch {
@@ -119,9 +119,9 @@ func (rw *meteredMsgReadWriter) WriteMsg(msg p2p.Msg) error {
 	case msg.Code == BlockBodiesMsg:
 		packets, traffic = reqBodyOutPacketsMeter, reqBodyOutTrafficMeter
 
-	case rw.version >= Eth63 && msg.Code == NodeDataMsg:
+	case rw.Version >= Eth63 && msg.Code == NodeDataMsg:
 		packets, traffic = reqStateOutPacketsMeter, reqStateOutTrafficMeter
-	case rw.version >= Eth63 && msg.Code == ReceiptsMsg:
+	case rw.Version >= Eth63 && msg.Code == ReceiptsMsg:
 		packets, traffic = reqReceiptOutPacketsMeter, reqReceiptOutTrafficMeter
 
 	case msg.Code == NewBlockHashesMsg:

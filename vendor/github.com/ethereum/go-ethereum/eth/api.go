@@ -91,7 +91,7 @@ func (api *PublicMinerAPI) SubmitWork(nonce types.BlockNonce, solution, digest c
 }
 
 // GetWork returns a work package for external Miner. The work package consists of 3 strings
-// result[0], 32 bytes hex encoded current block header pow-hash
+// result[0], 32 bytes hex encoded current Block header pow-hash
 // result[1], 32 bytes hex encoded seed hash used for DAG
 // result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
 func (api *PublicMinerAPI) GetWork() ([3]string, error) {
@@ -169,7 +169,7 @@ func (api *PrivateMinerAPI) Stop() bool {
 	return true
 }
 
-// SetExtra sets the extra data string that is included when this Miner mines a block.
+// SetExtra sets the extra data string that is included when this Miner mines a Block.
 func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
 	if err := api.e.GetMiner().SetExtra([]byte(extra)); err != nil {
 		return false, err
@@ -269,7 +269,7 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 			if err := stream.Decode(block); err == io.EOF {
 				break
 			} else if err != nil {
-				return false, fmt.Errorf("block %d: failed to parse: %v", index, err)
+				return false, fmt.Errorf("Block %d: failed to parse: %v", index, err)
 			}
 			blocks = append(blocks, block)
 			index++
@@ -303,11 +303,11 @@ func NewPublicDebugAPI(eth *Ethereum) *PublicDebugAPI {
 	return &PublicDebugAPI{eth: eth}
 }
 
-// DumpBlock retrieves the entire state of the database at a given block.
+// DumpBlock retrieves the entire state of the database at a given Block.
 func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error) {
 	if blockNr == rpc.PendingBlockNumber {
 		// If we're dumping the pending state, we need to request
-		// both the pending block as well as the pending state from
+		// both the pending Block as well as the pending state from
 		// the Miner and operate on those
 		_, stateDb := api.eth.Miner.Pending()
 		return stateDb.RawDump(), nil
@@ -319,7 +319,7 @@ func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error
 		block = api.eth.Blockchain.GetBlockByNumber(uint64(blockNr))
 	}
 	if block == nil {
-		return state.Dump{}, fmt.Errorf("block #%d not found", blockNr)
+		return state.Dump{}, fmt.Errorf("Block #%d not found", blockNr)
 	}
 	stateDb, err := api.eth.BlockChain().StateAt(block.Root())
 	if err != nil {
@@ -348,7 +348,7 @@ func (api *PrivateDebugAPI) Preimage(ctx context.Context, hash common.Hash) (hex
 }
 
 // GetBadBLocks returns a list of the last 'bad blocks' that the client has seen on the network
-// and returns them as a JSON list of block-hashes
+// and returns them as a JSON list of Block-hashes
 func (api *PrivateDebugAPI) GetBadBlocks(ctx context.Context) ([]core.BadBlockArgs, error) {
 	return api.eth.BlockChain().GetBadBlocks()
 }
@@ -366,7 +366,7 @@ type storageEntry struct {
 	Value common.Hash  `json:"value"`
 }
 
-// StorageRangeAt returns the storage at the given block height and transaction index.
+// StorageRangeAt returns the storage at the given Block height and transaction Index.
 func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
 	_, _, statedb, err := api.computeTxEnv(blockHash, txIndex, 0)
 	if err != nil {
@@ -406,25 +406,25 @@ func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeRes
 // two blocks specified. A change is defined as a difference in nonce, balance,
 // code hash, or storage hash.
 //
-// With one parameter, returns the list of accounts modified in the specified block.
+// With one parameter, returns the list of accounts modified in the specified Block.
 func (api *PrivateDebugAPI) GetModifiedAccountsByNumber(startNum uint64, endNum *uint64) ([]common.Address, error) {
 	var startBlock, endBlock *types.Block
 
 	startBlock = api.eth.Blockchain.GetBlockByNumber(startNum)
 	if startBlock == nil {
-		return nil, fmt.Errorf("start block %x not found", startNum)
+		return nil, fmt.Errorf("start Block %x not found", startNum)
 	}
 
 	if endNum == nil {
 		endBlock = startBlock
 		startBlock = api.eth.Blockchain.GetBlockByHash(startBlock.ParentHash())
 		if startBlock == nil {
-			return nil, fmt.Errorf("block %x has no parent", endBlock.Number())
+			return nil, fmt.Errorf("Block %x has no parent", endBlock.Number())
 		}
 	} else {
 		endBlock = api.eth.Blockchain.GetBlockByNumber(*endNum)
 		if endBlock == nil {
-			return nil, fmt.Errorf("end block %d not found", *endNum)
+			return nil, fmt.Errorf("end Block %d not found", *endNum)
 		}
 	}
 	return api.getModifiedAccounts(startBlock, endBlock)
@@ -434,24 +434,24 @@ func (api *PrivateDebugAPI) GetModifiedAccountsByNumber(startNum uint64, endNum 
 // two blocks specified. A change is defined as a difference in nonce, balance,
 // code hash, or storage hash.
 //
-// With one parameter, returns the list of accounts modified in the specified block.
+// With one parameter, returns the list of accounts modified in the specified Block.
 func (api *PrivateDebugAPI) GetModifiedAccountsByHash(startHash common.Hash, endHash *common.Hash) ([]common.Address, error) {
 	var startBlock, endBlock *types.Block
 	startBlock = api.eth.Blockchain.GetBlockByHash(startHash)
 	if startBlock == nil {
-		return nil, fmt.Errorf("start block %x not found", startHash)
+		return nil, fmt.Errorf("start Block %x not found", startHash)
 	}
 
 	if endHash == nil {
 		endBlock = startBlock
 		startBlock = api.eth.Blockchain.GetBlockByHash(startBlock.ParentHash())
 		if startBlock == nil {
-			return nil, fmt.Errorf("block %x has no parent", endBlock.Number())
+			return nil, fmt.Errorf("Block %x has no parent", endBlock.Number())
 		}
 	} else {
 		endBlock = api.eth.Blockchain.GetBlockByHash(*endHash)
 		if endBlock == nil {
-			return nil, fmt.Errorf("end block %x not found", *endHash)
+			return nil, fmt.Errorf("end Block %x not found", *endHash)
 		}
 	}
 	return api.getModifiedAccounts(startBlock, endBlock)
@@ -459,7 +459,7 @@ func (api *PrivateDebugAPI) GetModifiedAccountsByHash(startHash common.Hash, end
 
 func (api *PrivateDebugAPI) getModifiedAccounts(startBlock, endBlock *types.Block) ([]common.Address, error) {
 	if startBlock.Number().Uint64() >= endBlock.Number().Uint64() {
-		return nil, fmt.Errorf("start block height (%d) must be less than end block height (%d)", startBlock.Number().Uint64(), endBlock.Number().Uint64())
+		return nil, fmt.Errorf("start Block height (%d) must be less than end Block height (%d)", startBlock.Number().Uint64(), endBlock.Number().Uint64())
 	}
 
 	oldTrie, err := trie.NewSecure(startBlock.Root(), trie.NewDatabase(api.eth.ChainDb), 0)

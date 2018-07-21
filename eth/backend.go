@@ -31,7 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/miner"
+
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/eth"
@@ -43,10 +43,15 @@ import (
 	"github.com/tomochain/tomochain/consensus"
 	"sync/atomic"
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/tomochain/tomochain/internal/ethapi"
+	"github.com/tomochain/tomochain/ethapi"
 	"sync"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+
+	"github.com/tomochain/tomochain/miner"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/eth/filters"
 )
 
 type TomoChain struct {
@@ -191,7 +196,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 	if tomoChain.ProtocolManager, err = NewProtocolManager(tomoChain.ChainConfig, config.SyncMode, config.NetworkId, tomoChain.EventMux, tomoChain.TxPool, tomoChain.Engine, tomoChain.Blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	tomoChain.Miner = miner.New(tomoChain, tomoChain.ChainConfig, tomoChain.GetEventMux(), tomoChain.Engine.(ethconsensus.Engine))
+	tomoChain.Miner = miner.New(tomoChain, tomoChain.ChainConfig, tomoChain.GetEventMux(), tomoChain.Engine.(consensus.Engine))
 	tomoChain.Miner.SetExtra(eth.MakeExtraData(config.ExtraData))
 
 	tomoChain.APIBackend = &EthAPIBackend{tomoChain, nil}
@@ -345,3 +350,148 @@ func (s *TomoChain) GetClient() (*ethclient.Client, error) {
 	}
 	return s.Client, nil
 }
+
+
+func (s *TomoChain) AddLesServer(ls eth.LesServer) {
+	s.LesServer = ls
+	ls.SetBloomBitsIndexer(s.BloomIndexer)
+}
+
+func (s *TomoChain) Protocols() []p2p.Protocol {
+	if s.LesServer == nil {
+		return s.ProtocolManager.SubProtocols
+	}
+	return append(s.ProtocolManager.SubProtocols, s.LesServer.Protocols()...)
+}
+
+
+// APIs returns the collection of RPC services the ethereum package offers.
+// NOTE, some of these services probably need to be moved to somewhere else.
+func (s *TomoChain) APIs() []rpc.API {
+	apis := ethapi.GetAPIs(s.APIBackend)
+
+	// Append any APIs exposed explicitly by the consensus GetEngine
+	apis = append(apis, s.Engine.APIs(s.BlockChain())...)
+
+	// Append all the local APIs and return
+	return append(apis, []rpc.API{
+		{
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   eth.NewPublicEthereumAPI(s),
+			Public:    true,
+		}, {
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   eth.NewPublicMinerAPI(s),
+			Public:    true,
+		}, {
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   downloader.NewPublicDownloaderAPI(s.ProtocolManager.Downloader, s.EventMux),
+			Public:    true,
+		}, {
+			Namespace: "Miner",
+			Version:   "1.0",
+			Service:   eth.NewPrivateMinerAPI(s),
+			Public:    false,
+		}, {
+			Namespace: "eth",
+			Version:   "1.0",
+			Service:   filters.NewPublicFilterAPI(s.APIBackend, false),
+			Public:    true,
+		}, {
+			Namespace: "admin",
+			Version:   "1.0",
+			Service:   eth.NewPrivateAdminAPI(s),
+		}, {
+			Namespace: "debug",
+			Version:   "1.0",
+			Service:   eth.NewPublicDebugAPI(s),
+			Public:    true,
+		}, {
+			Namespace: "debug",
+			Version:   "1.0",
+			Service:   eth.NewPrivateDebugAPI(s.ChainConfig, s),
+		}, {
+			Namespace: "net",
+			Version:   "1.0",
+			Service:   s.NetRPCService,
+			Public:    true,
+		},
+	}...)
+}
+
+
+
+
+
+func (s *TomoChain) IsMining() bool         { return s.Miner.Mining() }
+func (s *TomoChain) GetMiner() *miner.Miner { return s.Miner }
+
+
+
+
+func (s *TomoChain) StartMining(local bool) error {
+	eb, err := s.GetEtherbase()
+	if err != nil {
+		log.Error("Cannot start mining without Etherbase", "err", err)
+		return fmt.Errorf("Etherbase missing: %v", err)
+	}
+	if clique, ok := s.Engine.(*clique.Clique); ok {
+		wallet, err := s.AccountManager.Find(accounts.Account{Address: eb})
+		if wallet == nil || err != nil {
+			log.Error("GetEtherbase account unavailable locally", "err", err)
+			return fmt.Errorf("signer missing: %v", err)
+		}
+		clique.Authorize(eb, wallet.SignHash)
+	}
+	if local {
+		// If local (CPU) mining is started, we can disable the transaction rejection
+		// mechanism introduced to speed sync times. CPU mining on mainnet is ludicrous
+		// so noone will ever hit this path, whereas marking sync done on CPU mining
+		// will ensure that private networks work in single Miner mode too.
+		atomic.StoreUint32(&s.ProtocolManager.AcceptTxs, 1)
+	}
+	go s.Miner.Start(eb)
+	return nil
+}
+
+
+
+// set in js console via admin interface or wrapper from cli flags
+func (self *TomoChain) SetEtherbase(etherbase common.Address) {
+	self.Lock.Lock()
+	self.Etherbase = etherbase
+	self.Lock.Unlock()
+
+	self.Miner.SetEtherbase(etherbase)
+}
+
+
+
+// Start implements node.Service, starting all internal goroutines needed by the
+// Ethereum protocol implementation.
+func (s *TomoChain) Start(srvr *p2p.Server) error {
+	// Start the bloom bits servicing goroutines
+	s.startBloomHandlers()
+
+	// Start the RPC service
+	s.NetRPCService = ethapi.NewPublicNetAPI(srvr, s.NetVersion())
+
+	// Figure out a max Peers count based on the server limits
+	maxPeers := srvr.MaxPeers
+	if s.Config.LightServ > 0 {
+		if s.Config.LightPeers >= srvr.MaxPeers {
+			return fmt.Errorf("invalid Peer Config: light Peer count (%d) >= total Peer count (%d)", s.Config.LightPeers, srvr.MaxPeers)
+		}
+		maxPeers -= s.Config.LightPeers
+	}
+	// Start the networking layer and the light server if requested
+	s.ProtocolManager.Start(maxPeers)
+	if s.LesServer != nil {
+		s.LesServer.Start(srvr)
+	}
+	return nil
+}
+

@@ -89,13 +89,13 @@ var errorToString = map[int]string{
 	ErrInvalidMsgCode:          "Invalid message code",
 	ErrProtocolVersionMismatch: "Protocol Version mismatch",
 	ErrNetworkIdMismatch:       "NetworkId mismatch",
-	ErrGenesisBlockMismatch:    "Genesis block mismatch",
+	ErrGenesisBlockMismatch:    "Genesis Block mismatch",
 	ErrNoStatusMsg:             "No status message",
 	ErrExtraStatusMsg:          "Extra status message",
 	ErrSuspendedPeer:           "Suspended Peer",
 }
 
-type txPool interface {
+type TxPool interface {
 	// AddRemotes should add the given transactions to the pool.
 	AddRemotes([]*types.Transaction) []error
 
@@ -117,13 +117,13 @@ type statusData struct {
 	GenesisBlock    common.Hash
 }
 
-// NewBlockHashesData is the network packet for the block announcements.
+// NewBlockHashesData is the network packet for the Block announcements.
 type NewBlockHashesData []struct {
-	Hash   common.Hash // Hash of one particular block being announced
-	Number uint64      // Number of one particular block being announced
+	Hash   common.Hash // Hash of one particular Block being announced
+	Number uint64      // Number of one particular Block being announced
 }
 
-// GetBlockHeadersData represents a block header query.
+// GetBlockHeadersData represents a Block header query.
 type GetBlockHeadersData struct {
 	Origin  hashOrNumber // Block from which to retrieve headers
 	Amount  uint64       // Maximum number of headers to retrieve
@@ -131,7 +131,7 @@ type GetBlockHeadersData struct {
 	Reverse bool         // Query direction (false = rising towards latest, true = falling towards genesis)
 }
 
-// hashOrNumber is a combined field for specifying an origin block.
+// hashOrNumber is a combined field for specifying an origin Block.
 type hashOrNumber struct {
 	Hash   common.Hash // Block hash from which to retrieve headers (excludes Number)
 	Number uint64      // Block hash from which to retrieve headers (excludes Hash)
@@ -150,7 +150,7 @@ func (hn *hashOrNumber) EncodeRLP(w io.Writer) error {
 }
 
 // DecodeRLP is a specialized decoder for hashOrNumber to decode the contents
-// into either a block hash or a block number.
+// into either a Block hash or a Block number.
 func (hn *hashOrNumber) DecodeRLP(s *rlp.Stream) error {
 	_, size, _ := s.Kind()
 	origin, err := s.Raw()
@@ -167,17 +167,17 @@ func (hn *hashOrNumber) DecodeRLP(s *rlp.Stream) error {
 	return err
 }
 
-// NewBlockData is the network packet for the block propagation message.
+// NewBlockData is the network packet for the Block propagation message.
 type NewBlockData struct {
 	Block *types.Block
 	TD    *big.Int
 }
 
-// blockBody represents the data content of a single block.
+// blockBody represents the data content of a single Block.
 type blockBody struct {
-	Transactions []*types.Transaction // Transactions contained within a block
-	Uncles       []*types.Header      // Uncles contained within a block
+	Transactions []*types.Transaction // Transactions contained within a Block
+	Uncles       []*types.Header      // Uncles contained within a Block
 }
 
-// BlockBodiesData is the network packet for block content distribution.
+// BlockBodiesData is the network packet for Block content distribution.
 type BlockBodiesData []*blockBody

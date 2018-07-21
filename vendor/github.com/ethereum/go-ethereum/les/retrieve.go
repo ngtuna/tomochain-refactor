@@ -310,7 +310,7 @@ func (r *sentReq) tryRequest() {
 	}
 
 	defer func() {
-		// send feedback to server pool and remove peer if hard timeout happened
+		// send feedback to Server pool and remove peer if hard timeout happened
 		pp, ok := p.(*peer)
 		if ok && r.rm.serverPool != nil {
 			respTime := time.Duration(mclock.Now() - reqSent)

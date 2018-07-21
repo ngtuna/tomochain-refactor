@@ -44,7 +44,7 @@ import (
 
 const (
 	SoftResponseLimit = 2 * 1024 * 1024 // Target maximum size of returned blocks, headers or node data.
-	EstHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
+	EstHeaderRlpSize  = 500             // Approximate size of an RLP encoded Block header
 
 	// TxChanSize is the size of channel listening to TxPreEvent.
 	// The number is referenced from the size of tx pool.
@@ -69,14 +69,14 @@ type ProtocolManager struct {
 	FastSync  uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
 	AcceptTxs uint32 // Flag whether we're considered synchronised (enables transaction processing)
 
-	Txpool      txPool
+	Txpool      TxPool
 	Blockchain  *core.BlockChain
 	Chainconfig *params.ChainConfig
 	MaxPeers    int
 
 	Downloader *downloader.Downloader
 	Fetcher    *fetcher.Fetcher
-	Peers      *peerSet
+	Peers      *PeerSet
 
 	SubProtocols []p2p.Protocol
 
@@ -98,7 +98,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages Peers capable
 // with the ethereum network.
-func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *event.TypeMux, txpool TxPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		NetworkId:   networkId,
@@ -170,7 +170,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	inserter := func(blocks types.Blocks) (int, error) {
 		// If fast sync is running, deny importing weird blocks
 		if atomic.LoadUint32(&manager.FastSync) == 1 {
-			log.Warn("Discarded bad propagated block", "number", blocks[0].Number(), "hash", blocks[0].Hash())
+			log.Warn("Discarded bad propagated Block", "number", blocks[0].Number(), "hash", blocks[0].Hash())
 			return 0, nil
 		}
 		atomic.StoreUint32(&manager.AcceptTxs, 1) // Mark initial sync done on any Fetcher import
@@ -243,7 +243,7 @@ func (pm *ProtocolManager) Stop() {
 }
 
 func (pm *ProtocolManager) NewPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
-	return newPeer(pv, p, newMeteredMsgWriter(rw))
+	return NewPeer(pv, p, NewMeteredMsgWriter(rw))
 }
 
 // Handle is the callback invoked to manage the life cycle of an eth Peer. When
@@ -267,7 +267,7 @@ func (pm *ProtocolManager) Handle(p *Peer) error {
 		p.Log().Debug("Ethereum handshake failed", "err", err)
 		return err
 	}
-	if rw, ok := p.Rw.(*meteredMsgReadWriter); ok {
+	if rw, ok := p.Rw.(*MeteredMsgReadWriter); ok {
 		rw.Init(p.Version)
 	}
 	// Register the Peer locally
@@ -365,7 +365,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 			// Advance to the next header of the query
 			switch {
 			case query.Origin.Hash != (common.Hash{}) && query.Reverse:
-				// Hash based traversal towards the genesis block
+				// Hash based traversal towards the genesis Block
 				for i := 0; i < int(query.Skip)+1; i++ {
 					if header := pm.Blockchain.GetHeader(query.Origin.Hash, number); header != nil {
 						query.Origin.Hash = header.ParentHash
@@ -376,7 +376,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 					}
 				}
 			case query.Origin.Hash != (common.Hash{}) && !query.Reverse:
-				// Hash based traversal towards the leaf block
+				// Hash based traversal towards the leaf Block
 				var (
 					current = origin.Number.Uint64()
 					next    = current + query.Skip + 1
@@ -397,7 +397,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 					}
 				}
 			case query.Reverse:
-				// Number based traversal towards the genesis block
+				// Number based traversal towards the genesis Block
 				if query.Origin.Number >= query.Skip+1 {
 					query.Origin.Number -= query.Skip + 1
 				} else {
@@ -405,7 +405,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 				}
 
 			case !query.Reverse:
-				// Number based traversal towards the leaf block
+				// Number based traversal towards the leaf Block
 				query.Origin.Number += query.Skip + 1
 			}
 		}
@@ -477,13 +477,13 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 			bodies []rlp.RawValue
 		)
 		for bytes < SoftResponseLimit && len(bodies) < downloader.MaxBlockFetch {
-			// Retrieve the hash of the next block
+			// Retrieve the hash of the next Block
 			if err := msgStream.Decode(&hash); err == rlp.EOL {
 				break
 			} else if err != nil {
 				return ErrResp(ErrDecode, "msg %v: %v", msg, err)
 			}
-			// Retrieve the requested block body, stopping if enough was found
+			// Retrieve the requested Block body, stopping if enough was found
 			if data := pm.Blockchain.GetBodyRLP(hash); len(data) != 0 {
 				bodies = append(bodies, data)
 				bytes += len(data)
@@ -492,7 +492,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 		return p.SendBlockBodiesRLP(bodies)
 
 	case msg.Code == BlockBodiesMsg:
-		// A batch of block bodies arrived to one of our previous requests
+		// A batch of Block bodies arrived to one of our previous requests
 		var request BlockBodiesData
 		if err := msg.Decode(&request); err != nil {
 			return ErrResp(ErrDecode, "msg %v: %v", msg, err)
@@ -568,13 +568,13 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 			receipts []rlp.RawValue
 		)
 		for bytes < SoftResponseLimit && len(receipts) < downloader.MaxReceiptFetch {
-			// Retrieve the hash of the next block
+			// Retrieve the hash of the next Block
 			if err := msgStream.Decode(&hash); err == rlp.EOL {
 				break
 			} else if err != nil {
 				return ErrResp(ErrDecode, "msg %v: %v", msg, err)
 			}
-			// Retrieve the requested block's receipts, skipping if unknown to us
+			// Retrieve the requested Block's receipts, skipping if unknown to us
 			results := pm.Blockchain.GetReceiptsByHash(hash)
 			if results == nil {
 				if header := pm.Blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
@@ -623,7 +623,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 		}
 
 	case msg.Code == NewBlockMsg:
-		// Retrieve and decode the propagated block
+		// Retrieve and decode the propagated Block
 		var request NewBlockData
 		if err := msg.Decode(&request); err != nil {
 			return ErrResp(ErrDecode, "%v: %v", msg, err)
@@ -631,11 +631,11 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 		request.Block.ReceivedAt = msg.ReceivedAt
 		request.Block.ReceivedFrom = p
 
-		// Mark the Peer as owning the block and schedule it for import
+		// Mark the Peer as owning the Block and schedule it for import
 		p.MarkBlock(request.Block.Hash())
 		pm.Fetcher.Enqueue(p.Id, request.Block)
 
-		// Assuming the block is importable by the Peer, but possibly not yet done so,
+		// Assuming the Block is importable by the Peer, but possibly not yet done so,
 		// calculate the GetHead hash and TD that the Peer truly must have.
 		var (
 			trueHead = request.Block.ParentHash()
@@ -646,7 +646,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 			p.SetHead(trueHead, trueTD)
 
 			// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
-			// a singe block (as the true TD is below the propagated block), however this
+			// a singe Block (as the true TD is below the propagated Block), however this
 			// scenario should easily be covered by the Fetcher.
 			currentBlock := pm.Blockchain.GetCurrentBlock()
 			if trueTD.Cmp(pm.Blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
@@ -679,7 +679,7 @@ func (pm *ProtocolManager) handleMsg(p *Peer) error {
 	return nil
 }
 
-// BroadcastBlock will either propagate a block to a subset of it's Peers, or
+// BroadcastBlock will either propagate a Block to a subset of it's Peers, or
 // will only announce it's availability (depending what's requested).
 func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	hash := block.Hash()
@@ -687,28 +687,28 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 
 	// If propagation is requested, send to a subset of the Peer
 	if propagate {
-		// Calculate the TD of the block (it's not imported yet, so block.Td is not valid)
+		// Calculate the TD of the Block (it's not imported yet, so Block.Td is not valid)
 		var td *big.Int
 		if parent := pm.Blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1); parent != nil {
 			td = new(big.Int).Add(block.Difficulty(), pm.Blockchain.GetTd(block.ParentHash(), block.NumberU64()-1))
 		} else {
-			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
+			log.Error("Propagating dangling Block", "number", block.Number(), "hash", hash)
 			return
 		}
-		// Send the block to a subset of our Peers
+		// Send the Block to a subset of our Peers
 		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
 		for _, peer := range transfer {
 			peer.SendNewBlock(block, td)
 		}
-		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+		log.Trace("Propagated Block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
 	}
-	// Otherwise if the block is indeed in out own chain, announce it
+	// Otherwise if the Block is indeed in out own chain, announce it
 	if pm.Blockchain.HasBlock(hash, block.NumberU64()) {
 		for _, peer := range peers {
 			peer.SendNewBlockHashes([]common.Hash{hash}, []uint64{block.NumberU64()})
 		}
-		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+		log.Trace("Announced Block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 	}
 }
 
@@ -730,7 +730,7 @@ func (self *ProtocolManager) minedBroadcastLoop() {
 	for obj := range self.MinedBlockSub.Chan() {
 		switch ev := obj.Data.(type) {
 		case core.NewMinedBlockEvent:
-			self.BroadcastBlock(ev.Block, true)  // First propagate block to Peers
+			self.BroadcastBlock(ev.Block, true)  // First propagate Block to Peers
 			self.BroadcastBlock(ev.Block, false) // Only then announce to the rest
 		}
 	}
@@ -742,7 +742,7 @@ func (self *ProtocolManager) txBroadcastLoop() {
 		case event := <-self.TxCh:
 			self.BroadcastTx(event.Tx.Hash(), event.Tx)
 
-		// Err() channel will be closed when unsubscribing.
+		// Err() channel will be Closed when unsubscribing.
 		case <-self.TxSub.Err():
 			return
 		}
@@ -754,9 +754,9 @@ func (self *ProtocolManager) txBroadcastLoop() {
 type NodeInfo struct {
 	Network    uint64              `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
 	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's Blockchain
-	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
+	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis Block
 	Config     *params.ChainConfig `json:"Config"`     // Chain configuration for the fork rules
-	Head       common.Hash         `json:"GetHead"`       // SHA3 hash of the host's best owned block
+	Head       common.Hash         `json:"GetHead"`       // SHA3 hash of the host's best owned Block
 }
 
 // NodeInfo retrieves some protocol metadata about the running host node.

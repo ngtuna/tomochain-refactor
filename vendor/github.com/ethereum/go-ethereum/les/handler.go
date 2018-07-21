@@ -98,9 +98,9 @@ type ProtocolManager struct {
 	networkId   uint64
 	chainConfig *params.ChainConfig
 	blockchain  BlockChain
-	chainDb     ethdb.Database
+	ChainDb     ethdb.Database
 	odr         *LesOdr
-	server      *LesServer
+	Server      *LesServer
 	serverPool  *serverPool
 	lesTopic    discv5.Topic
 	reqDist     *requestDistributor
@@ -134,7 +134,7 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
 		eventMux:    mux,
 		blockchain:  blockchain,
 		chainConfig: chainConfig,
-		chainDb:     chainDb,
+		ChainDb:     chainDb,
 		odr:         odr,
 		networkId:   networkId,
 		txpool:      txpool,
@@ -275,7 +275,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		number  = head.Number.Uint64()
 		td      = pm.blockchain.GetTd(hash, number)
 	)
-	if err := p.Handshake(td, hash, number, genesis.Hash(), pm.server); err != nil {
+	if err := p.Handshake(td, hash, number, genesis.Hash(), pm.Server); err != nil {
 		p.Log().Debug("Light Ethereum handshake failed", "err", err)
 		return err
 	}
@@ -288,8 +288,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		return err
 	}
 	defer func() {
-		if pm.server != nil && pm.server.fcManager != nil && p.fcClient != nil {
-			p.fcClient.Remove(pm.server.fcManager)
+		if pm.Server != nil && pm.Server.FcManager != nil && p.fcClient != nil {
+			p.fcClient.Remove(pm.Server.FcManager)
 		}
 		pm.removePeer(p.id)
 	}()
@@ -349,11 +349,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		bufValue, _ := p.fcClient.AcceptRequest()
 		cost := costs.baseCost + reqCnt*costs.reqCost
-		if cost > pm.server.defParams.BufLimit {
-			cost = pm.server.defParams.BufLimit
+		if cost > pm.Server.DefParams.BufLimit {
+			cost = pm.Server.DefParams.BufLimit
 		}
 		if cost > bufValue {
-			recharge := time.Duration((cost - bufValue) * 1000000 / pm.server.defParams.MinRecharge)
+			recharge := time.Duration((cost - bufValue) * 1000000 / pm.Server.DefParams.MinRecharge)
 			p.Log().Error("Request came too early", "recharge", common.PrettyDuration(recharge))
 			return true
 		}
@@ -477,7 +477,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + query.Amount*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, query.Amount, rcost)
+		pm.Server.FcCostStats.update(msg.Code, query.Amount, rcost)
 		return p.SendBlockHeaders(req.ReqID, bv, headers)
 
 	case BlockHeadersMsg:
@@ -528,13 +528,13 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				break
 			}
 			// Retrieve the requested block body, stopping if enough was found
-			if data := core.GetBodyRLP(pm.chainDb, hash, core.GetBlockNumber(pm.chainDb, hash)); len(data) != 0 {
+			if data := core.GetBodyRLP(pm.ChainDb, hash, core.GetBlockNumber(pm.ChainDb, hash)); len(data) != 0 {
 				bodies = append(bodies, data)
 				bytes += len(data)
 			}
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 		return p.SendBlockBodiesRLP(req.ReqID, bv, bodies)
 
 	case BlockBodiesMsg:
@@ -579,7 +579,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		for _, req := range req.Reqs {
 			// Retrieve the requested state entry, stopping if enough was found
-			if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
+			if header := core.GetHeader(pm.ChainDb, req.BHash, core.GetBlockNumber(pm.ChainDb, req.BHash)); header != nil {
 				statedb, err := pm.blockchain.State()
 				if err != nil {
 					continue
@@ -597,7 +597,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 		return p.SendCode(req.ReqID, bv, data)
 
 	case CodeMsg:
@@ -645,7 +645,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				break
 			}
 			// Retrieve the requested block's receipts, skipping if unknown to us
-			results := core.GetBlockReceipts(pm.chainDb, hash, core.GetBlockNumber(pm.chainDb, hash))
+			results := core.GetBlockReceipts(pm.ChainDb, hash, core.GetBlockNumber(pm.ChainDb, hash))
 			if results == nil {
 				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
 					continue
@@ -660,7 +660,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 		return p.SendReceiptsRLP(req.ReqID, bv, receipts)
 
 	case ReceiptsMsg:
@@ -705,7 +705,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		for _, req := range req.Reqs {
 			// Retrieve the requested state entry, stopping if enough was found
-			if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
+			if header := core.GetHeader(pm.ChainDb, req.BHash, core.GetBlockNumber(pm.ChainDb, req.BHash)); header != nil {
 				statedb, err := pm.blockchain.State()
 				if err != nil {
 					continue
@@ -732,7 +732,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 		return p.SendProofs(req.ReqID, bv, proofs)
 
 	case GetProofsV2Msg:
@@ -763,7 +763,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			if statedb == nil || req.BHash != lastBHash {
 				statedb, root, lastBHash = nil, common.Hash{}, req.BHash
 
-				if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
+				if header := core.GetHeader(pm.ChainDb, req.BHash, core.GetBlockNumber(pm.ChainDb, req.BHash)); header != nil {
 					statedb, _ = pm.blockchain.State()
 					root = header.Root
 				}
@@ -792,7 +792,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 		return p.SendProofsV2(req.ReqID, bv, nodes.NodeList())
 
 	case ProofsV1Msg:
@@ -856,11 +856,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if reject(uint64(reqCnt), MaxHelperTrieProofsFetch) {
 			return errResp(ErrRequestRejected, "")
 		}
-		trieDb := trie.NewDatabase(ethdb.NewTable(pm.chainDb, light.ChtTablePrefix))
+		trieDb := trie.NewDatabase(ethdb.NewTable(pm.ChainDb, light.ChtTablePrefix))
 		for _, req := range req.Reqs {
 			if header := pm.blockchain.GetHeaderByNumber(req.BlockNum); header != nil {
-				sectionHead := core.GetCanonicalHash(pm.chainDb, req.ChtNum*light.CHTFrequencyServer-1)
-				if root := light.GetChtRoot(pm.chainDb, req.ChtNum-1, sectionHead); root != (common.Hash{}) {
+				sectionHead := core.GetCanonicalHash(pm.ChainDb, req.ChtNum*light.CHTFrequencyServer-1)
+				if root := light.GetChtRoot(pm.ChainDb, req.ChtNum-1, sectionHead); root != (common.Hash{}) {
 					trie, err := trie.New(root, trieDb)
 					if err != nil {
 						continue
@@ -879,7 +879,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 		return p.SendHeaderProofs(req.ReqID, bv, proofs)
 
 	case GetHelperTrieProofsMsg:
@@ -915,7 +915,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
 				var prefix string
 				if root, prefix = pm.getHelperTrie(req.Type, req.TrieIdx); root != (common.Hash{}) {
-					auxTrie, _ = trie.New(root, trie.NewDatabase(ethdb.NewTable(pm.chainDb, prefix)))
+					auxTrie, _ = trie.New(root, trie.NewDatabase(ethdb.NewTable(pm.ChainDb, prefix)))
 				}
 			}
 			if req.AuxReq == auxRoot {
@@ -940,7 +940,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 		return p.SendHelperTrieProofs(req.ReqID, bv, HelperTrieResps{Proofs: nodes.NodeList(), AuxData: auxData})
 
 	case HeaderProofsMsg:
@@ -1000,7 +1000,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		pm.txpool.AddRemotes(txs)
 
 		_, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 
 	case SendTxV2Msg:
 		if pm.txpool == nil {
@@ -1035,7 +1035,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 
 		return p.SendTxStatus(req.ReqID, bv, stats)
 
@@ -1056,7 +1056,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrRequestRejected, "")
 		}
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
+		pm.Server.FcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 
 		return p.SendTxStatus(req.ReqID, bv, pm.txStatus(req.Hashes))
 
@@ -1114,11 +1114,11 @@ func (pm *ProtocolManager) getAccount(statedb *state.StateDB, root, hash common.
 func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, string) {
 	switch id {
 	case htCanonical:
-		sectionHead := core.GetCanonicalHash(pm.chainDb, (idx+1)*light.CHTFrequencyClient-1)
-		return light.GetChtV2Root(pm.chainDb, idx, sectionHead), light.ChtTablePrefix
+		sectionHead := core.GetCanonicalHash(pm.ChainDb, (idx+1)*light.CHTFrequencyClient-1)
+		return light.GetChtV2Root(pm.ChainDb, idx, sectionHead), light.ChtTablePrefix
 	case htBloomBits:
-		sectionHead := core.GetCanonicalHash(pm.chainDb, (idx+1)*light.BloomTrieFrequency-1)
-		return light.GetBloomTrieRoot(pm.chainDb, idx, sectionHead), light.BloomTrieTablePrefix
+		sectionHead := core.GetCanonicalHash(pm.ChainDb, (idx+1)*light.BloomTrieFrequency-1)
+		return light.GetBloomTrieRoot(pm.ChainDb, idx, sectionHead), light.BloomTrieTablePrefix
 	}
 	return common.Hash{}, ""
 }
@@ -1128,8 +1128,8 @@ func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
 	switch {
 	case req.Type == htCanonical && req.AuxReq == auxHeader && len(req.Key) == 8:
 		blockNum := binary.BigEndian.Uint64(req.Key)
-		hash := core.GetCanonicalHash(pm.chainDb, blockNum)
-		return core.GetHeaderRLP(pm.chainDb, hash, blockNum)
+		hash := core.GetCanonicalHash(pm.ChainDb, blockNum)
+		return core.GetHeaderRLP(pm.ChainDb, hash, blockNum)
 	}
 	return nil
 }
@@ -1142,7 +1142,7 @@ func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
 
 		// If the transaction is unknown to the pool, try looking it up locally
 		if stat == core.TxStatusUnknown {
-			if block, number, index := core.GetTxLookupEntry(pm.chainDb, hashes[i]); block != (common.Hash{}) {
+			if block, number, index := core.GetTxLookupEntry(pm.ChainDb, hashes[i]); block != (common.Hash{}) {
 				stats[i].Status = core.TxStatusIncluded
 				stats[i].Lookup = &core.TxLookupEntry{BlockHash: block, BlockIndex: number, Index: index}
 			}
@@ -1157,7 +1157,7 @@ type NodeInfo struct {
 	Network    uint64              `json:"network"`    // Ethereum network ID (1=Frontier, 2=Morden, Ropsten=3, Rinkeby=4)
 	Difficulty *big.Int            `json:"difficulty"` // Total difficulty of the host's blockchain
 	Genesis    common.Hash         `json:"genesis"`    // SHA3 hash of the host's genesis block
-	Config     *params.ChainConfig `json:"config"`     // Chain configuration for the fork rules
+	Config     *params.ChainConfig `json:"Config"`     // Chain configuration for the fork rules
 	Head       common.Hash         `json:"head"`       // SHA3 hash of the host's best owned block
 }
 

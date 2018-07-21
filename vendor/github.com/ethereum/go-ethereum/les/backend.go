@@ -88,9 +88,9 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	if _, isCompat := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !isCompat {
 		return nil, genesisErr
 	}
-	log.Info("Initialised chain configuration", "config", chainConfig)
+	log.Info("Initialised chain configuration", "Config", chainConfig)
 
-	peers := newPeerSet()
+	peers := NewPeerSet()
 	quitSync := make(chan struct{})
 
 	leth := &LightEthereum{
@@ -118,7 +118,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		return nil, err
 	}
 	leth.bloomIndexer.Start(leth.blockchain)
-	// Rewind the chain in case of an incompatible config upgrade.
+	// Rewind the chain in case of an incompatible Config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
 		leth.blockchain.SetHead(compat.RewindTo)
@@ -138,7 +138,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	return leth, nil
 }
 
-func lesTopic(genesisHash common.Hash, protocolVersion uint) discv5.Topic {
+func LesTopic(genesisHash common.Hash, protocolVersion uint) discv5.Topic {
 	var name string
 	switch protocolVersion {
 	case lpv1:
@@ -226,7 +226,7 @@ func (s *LightEthereum) Start(srvr *p2p.Server) error {
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.networkId)
 	// clients are searching for the first advertised protocol in the list
 	protocolVersion := AdvertiseProtocolVersions[0]
-	s.serverPool.start(srvr, lesTopic(s.blockchain.Genesis().Hash(), protocolVersion))
+	s.serverPool.start(srvr, LesTopic(s.blockchain.Genesis().Hash(), protocolVersion))
 	s.protocolManager.Start(s.config.LightPeers)
 	return nil
 }

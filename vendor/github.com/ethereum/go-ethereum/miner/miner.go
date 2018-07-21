@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package miner implements Ethereum block creation and mining.
+// Package miner implements Ethereum block creation and Mining.
 package miner
 
 import (
@@ -34,7 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-// Backend wraps all methods required for mining.
+// Backend wraps all methods required for Mining.
 type Backend interface {
 	GetAccountManager() *accounts.Manager
 	BlockChain() *core.BlockChain
@@ -46,14 +46,14 @@ type Backend interface {
 type Miner struct {
 	mux *event.TypeMux
 
-	worker *worker
+	worker *Worker
 
 	coinbase common.Address
 	mining   int32
 	eth      Backend
 	engine   consensus.Engine
 
-	canStart    int32 // can start indicates whether we can start the mining operation
+	canStart    int32 // can start indicates whether we can start the Mining operation
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
@@ -71,10 +71,10 @@ func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine con
 	return miner
 }
 
-// update keeps track of the downloader events. Please be aware that this is a one shot type of update loop.
+// Update keeps track of the downloader events. Please be aware that this is a one shot type of Update loop.
 // It's entered once and as soon as `Done` or `Failed` has been broadcasted the events are unregistered and
 // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
-// and halt your mining operation for as long as the DOS continues.
+// and halt your Mining operation for as long as the DOS continues.
 func (self *Miner) update() {
 	events := self.mux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
 out:
@@ -113,7 +113,7 @@ func (self *Miner) Start(coinbase common.Address) {
 	}
 	atomic.StoreInt32(&self.mining, 1)
 
-	log.Info("Starting mining operation")
+	log.Info("Starting Mining operation")
 	self.worker.start()
 	self.worker.commitNewWork()
 }
@@ -144,9 +144,9 @@ func (self *Miner) HashRate() (tot int64) {
 		tot += int64(pow.Hashrate())
 	}
 	// do we care this might race? is it worth we're rewriting some
-	// aspects of the worker/locking up agents so we can get an accurate
-	// hashrate?
-	for agent := range self.worker.agents {
+	// aspects of the Worker/locking up Agents so we can get an accurate
+	// Hashrate?
+	for agent := range self.worker.Agents {
 		if _, ok := agent.(*CpuAgent); !ok {
 			tot += agent.GetHashRate()
 		}
@@ -162,15 +162,15 @@ func (self *Miner) SetExtra(extra []byte) error {
 	return nil
 }
 
-// GetPending returns the currently pending block and associated state.
+// GetPending returns the currently pending block and associated State.
 func (self *Miner) Pending() (*types.Block, *state.StateDB) {
 	return self.worker.pending()
 }
 
 // PendingBlock returns the currently pending block.
 //
-// Note, to access both the pending block and the pending state
-// simultaneously, please use GetPending(), as the pending state can
+// Note, to access both the pending block and the pending State
+// simultaneously, please use GetPending(), as the pending State can
 // change between multiple method calls
 func (self *Miner) PendingBlock() *types.Block {
 	return self.worker.pendingBlock()

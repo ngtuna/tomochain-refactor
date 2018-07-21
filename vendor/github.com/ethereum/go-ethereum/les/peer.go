@@ -72,7 +72,7 @@ type peer struct {
 	hasBlock       func(common.Hash, uint64) bool
 	responseErrors int
 
-	fcClient       *flowcontrol.ClientNode // nil if the peer is server only
+	fcClient       *flowcontrol.ClientNode // nil if the peer is Server only
 	fcServer       *flowcontrol.ServerNode // nil if the peer is client only
 	fcServerParams *flowcontrol.ServerParams
 	fcCosts        requestCostTable
@@ -409,9 +409,9 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		send = send.add("serveChainSince", uint64(0))
 		send = send.add("serveStateSince", uint64(0))
 		send = send.add("txRelay", nil)
-		send = send.add("flowControl/BL", server.defParams.BufLimit)
-		send = send.add("flowControl/MRR", server.defParams.MinRecharge)
-		list := server.fcCostStats.getCurrentList()
+		send = send.add("flowControl/BL", server.DefParams.BufLimit)
+		send = send.add("flowControl/MRR", server.DefParams.MinRecharge)
+		list := server.FcCostStats.getCurrentList()
 		send = send.add("flowControl/MRC", list)
 		p.fcCosts = list.decode()
 	} else {
@@ -459,12 +459,12 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 	if server != nil {
 		// until we have a proper peer connectivity API, allow LES connection to other servers
 		/*if recv.get("serveStateSince", nil) == nil {
-			return errResp(ErrUselessPeer, "wanted client, got server")
+			return errResp(ErrUselessPeer, "wanted client, got Server")
 		}*/
 		if recv.get("announceType", &p.announceType) != nil {
 			p.announceType = announceTypeSimple
 		}
-		p.fcClient = flowcontrol.NewClientNode(server.fcManager, server.defParams)
+		p.fcClient = flowcontrol.NewClientNode(server.FcManager, server.DefParams)
 	} else {
 		if recv.get("serveChainSince", nil) != nil {
 			return errResp(ErrUselessPeer, "peer cannot serve chain")
@@ -518,8 +518,8 @@ type peerSet struct {
 	closed     bool
 }
 
-// newPeerSet creates a new peer set to track the active participants.
-func newPeerSet() *peerSet {
+// NewPeerSet creates a new peer set to track the active participants.
+func NewPeerSet() *peerSet {
 	return &peerSet{
 		peers: make(map[string]*peer),
 	}

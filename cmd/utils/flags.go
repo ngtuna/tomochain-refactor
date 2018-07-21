@@ -57,6 +57,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"gopkg.in/urfave/cli.v1"
+	tomoEth "github.com/tomochain/tomochain/eth"
+	tomeLes "github.com/tomochain/tomochain/les"
 )
 
 var (
@@ -1129,9 +1131,9 @@ func RegisterEthService(stack *node.Node, cfg *eth.Config) {
 		})
 	} else {
 		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-			fullNode, err := eth.New(ctx, cfg)
+			fullNode, err := tomoEth.New(ctx, cfg)
 			if fullNode != nil && cfg.LightServ > 0 {
-				ls, _ := les.NewLesServer(fullNode, cfg)
+				ls, _ := tomeLes.NewLesServer(fullNode, cfg)
 				fullNode.AddLesServer(ls)
 			}
 			return fullNode, err

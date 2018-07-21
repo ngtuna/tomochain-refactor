@@ -357,7 +357,7 @@
 			"revisionTime": "2018-03-28T12:35:41Z"
 		},
 		{
-			"checksumSHA1": "nOmcJ1F6keLqbIf2XDCmxAmpajk=",
+			"checksumSHA1": "V+MqAGDmM2rT3myX9Yj471FBXrA=",
 			"path": "github.com/ethereum/go-ethereum/eth",
 			"revision": "a095b84ec5a35cb3432380cc677d4e244b4a137f",
 			"revisionTime": "2018-03-28T12:35:41Z"
@@ -477,7 +477,7 @@
 			"revisionTime": "2018-03-28T12:35:41Z"
 		},
 		{
-			"checksumSHA1": "zhgnC629OHE36EE8pwZf8RWNvfg=",
+			"checksumSHA1": "kwLn5yrfbFkWHVlEU66iylqUEFA=",
 			"path": "github.com/ethereum/go-ethereum/les",
 			"revision": "a095b84ec5a35cb3432380cc677d4e244b4a137f",
 			"revisionTime": "2018-03-28T12:35:41Z"
@@ -531,7 +531,7 @@
 			"revisionTime": "2018-03-28T12:35:41Z"
 		},
 		{
-			"checksumSHA1": "ifnjGYTQDvWzhBNCKp/RIoUb1YY=",
+			"checksumSHA1": "VEC4eM4sUauS98Pgos2Y9JbN7Xw=",
 			"path": "github.com/ethereum/go-ethereum/miner",
 			"revision": "a095b84ec5a35cb3432380cc677d4e244b4a137f",
 			"revisionTime": "2018-03-28T12:35:41Z"
@@ -799,13 +799,6 @@
 			"path": "github.com/julienschmidt/httprouter",
 			"revision": "975b5c4c7c21c0e3d2764200bf2aa8e34657ae6e",
 			"revisionTime": "2017-04-30T22:20:11Z"
-		},
-		{
-			"checksumSHA1": "UpjhOUZ1+0zNt+iIvdtECSHXmTs=",
-			"path": "github.com/karalabe/hid",
-			"revision": "f00545f9f3748e591590be3732d913c77525b10f",
-			"revisionTime": "2017-08-21T10:38:37Z",
-			"tree": true
 		},
 		{
 			"checksumSHA1": "7hln62oZPZmyqEmgXaybf9WxQ7A=",
@@ -1298,11 +1291,6 @@
 			"path": "gopkg.in/natefinch/npipe.v2",
 			"revision": "c1b8fa8bdccecb0b8db834ee0b92fdbcfa606dd6",
 			"revisionTime": "2016-06-21T03:49:01Z"
-		},
-		{
-			"checksumSHA1": "vndxs5Tv09/8S+Dr2PBAiM557lI=",
-			"path": "gopkg.in/olebedev/go-duktape.v3",
-			"revision": ""
 		},
 		{
 			"checksumSHA1": "4BwmmgQUhWtizsR2soXND0nqZ1I=",

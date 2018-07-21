@@ -80,7 +80,7 @@ type Ethereum struct {
 	AccountManager *accounts.Manager
 
 	BloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	BloomIndexer  *core.ChainIndexer             // Bloom indexer operating during block imports
+	BloomIndexer  *core.ChainIndexer             // Bloom indexer operating during Block imports
 
 	ApiBackend *EthApiBackend
 

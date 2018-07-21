@@ -38,7 +38,7 @@ import (
 	"gopkg.in/urfave/cli.v1"
 
 	"github.com/tomochain/tomochain/cmd/utils"
-	"github.com/tomochain/tomochain/internal/debug"
+	//"github.com/tomochain/tomochain/internal/debug"
 
 	"github.com/tomochain/tomochain/eth"
 	"github.com/tomochain/tomochain/core"
@@ -190,14 +190,14 @@ func init() {
 	app.Flags = append(app.Flags, nodeFlags...)
 	app.Flags = append(app.Flags, rpcFlags...)
 	app.Flags = append(app.Flags, consoleFlags...)
-	app.Flags = append(app.Flags, debug.Flags...)
+	//app.Flags = append(app.Flags, debug.Flags...)
 	app.Flags = append(app.Flags, whisperFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
-		if err := debug.Setup(ctx); err != nil {
-			return err
-		}
+		//if err := debug.Setup(ctx); err != nil {
+		//	return err
+		//}
 		// Start system runtime metrics collection
 		go metrics.CollectProcessMetrics(3 * time.Second)
 
@@ -206,7 +206,7 @@ func init() {
 	}
 
 	app.After = func(ctx *cli.Context) error {
-		debug.Exit()
+		//debug.Exit()
 		console.Stdin.Close() // Resets terminal mode.
 		return nil
 	}

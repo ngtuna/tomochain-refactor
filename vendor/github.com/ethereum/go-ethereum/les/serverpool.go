@@ -57,9 +57,9 @@ const (
 	// target for servers selected from the known table
 	// (we leave room for trying new ones if there is any)
 	targetKnownSelect = 3
-	// after dialTimeout, consider the server unavailable and adjust statistics
+	// after dialTimeout, consider the Server unavailable and adjust statistics
 	dialTimeout = time.Second * 30
-	// targetConnTime is the minimum expected connection duration before a server
+	// targetConnTime is the minimum expected connection duration before a Server
 	// drops a client without any specific reason
 	targetConnTime = time.Minute * 10
 	// new entry selection weight calculation based on most recent discovery time:
@@ -92,7 +92,7 @@ const (
 )
 
 // serverPool implements a pool for storing and selecting newly discovered and already
-// known light server nodes. It received discovered nodes, stores statistics about
+// known light Server nodes. It received discovered nodes, stores statistics about
 // known nodes and takes care of always having enough good quality servers connected.
 type serverPool struct {
 	db     ethdb.Database
@@ -157,7 +157,7 @@ func (pool *serverPool) start(server *p2p.Server, topic discv5.Topic) {
 }
 
 // connect should be called upon any incoming connection. If the connection has been
-// dialed by the server pool recently, the appropriate pool entry is returned.
+// dialed by the Server pool recently, the appropriate pool entry is returned.
 // Otherwise, the connection should be rejected.
 // Note that whenever a connection has been accepted and a pool entry has been returned,
 // disconnect should also always be called.
@@ -393,7 +393,7 @@ func (pool *serverPool) loadNodes() {
 		return
 	}
 	for _, e := range list {
-		log.Debug("Loaded server stats", "id", e.id, "fails", e.lastConnected.fails,
+		log.Debug("Loaded Server stats", "id", e.id, "fails", e.lastConnected.fails,
 			"conn", fmt.Sprintf("%v/%v", e.connectStats.avg, e.connectStats.weight),
 			"delay", fmt.Sprintf("%v/%v", time.Duration(e.delayStats.avg), e.delayStats.weight),
 			"response", fmt.Sprintf("%v/%v", time.Duration(e.responseStats.avg), e.responseStats.weight),
@@ -542,7 +542,7 @@ const (
 	psRegistered
 )
 
-// poolEntry represents a server node and stores its current state and statistics.
+// poolEntry represents a Server node and stores its current state and statistics.
 type poolEntry struct {
 	peer                  *peer
 	id                    discover.NodeID

@@ -30,9 +30,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-type hashrate struct {
-	ping time.Time
-	rate uint64
+type Hashrate struct {
+	Ping time.Time
+	Rate uint64
 }
 
 type RemoteAgent struct {
@@ -48,7 +48,7 @@ type RemoteAgent struct {
 	work        map[common.Hash]*Work
 
 	hashrateMu sync.RWMutex
-	hashrate   map[common.Hash]hashrate
+	hashrate   map[common.Hash]Hashrate
 
 	running int32 // running indicates whether the agent is active. Call atomically
 }
@@ -58,7 +58,7 @@ func NewRemoteAgent(chain consensus.ChainReader, engine consensus.Engine) *Remot
 		chain:    chain,
 		engine:   engine,
 		work:     make(map[common.Hash]*Work),
-		hashrate: make(map[common.Hash]hashrate),
+		hashrate: make(map[common.Hash]Hashrate),
 	}
 }
 
@@ -66,7 +66,7 @@ func (a *RemoteAgent) SubmitHashrate(id common.Hash, rate uint64) {
 	a.hashrateMu.Lock()
 	defer a.hashrateMu.Unlock()
 
-	a.hashrate[id] = hashrate{time.Now(), rate}
+	a.hashrate[id] = Hashrate{time.Now(), rate}
 }
 
 func (a *RemoteAgent) Work() chan<- *Work {
@@ -94,14 +94,14 @@ func (a *RemoteAgent) Stop() {
 	close(a.workCh)
 }
 
-// GetHashRate returns the accumulated hashrate of all identifier combined
+// GetHashRate returns the accumulated Hashrate of all identifier combined
 func (a *RemoteAgent) GetHashRate() (tot int64) {
 	a.hashrateMu.RLock()
 	defer a.hashrateMu.RUnlock()
 
 	// this could overflow
 	for _, hashrate := range a.hashrate {
-		tot += int64(hashrate.rate)
+		tot += int64(hashrate.Rate)
 	}
 	return
 }
@@ -162,8 +162,8 @@ func (a *RemoteAgent) SubmitWork(nonce types.BlockNonce, mixDigest, hash common.
 	return true
 }
 
-// loop monitors mining events on the work and quit channels, updating the internal
-// state of the remote miner until a termination is requested.
+// loop monitors Mining events on the work and quit channels, updating the internal
+// State of the remote miner until a termination is requested.
 //
 // Note, the reason the work and quit channels are passed as parameters is because
 // RemoteAgent.Start() constantly recreates these channels, so the loop code cannot
@@ -184,7 +184,7 @@ func (a *RemoteAgent) loop(workCh chan *Work, quitCh chan struct{}) {
 			// cleanup
 			a.mu.Lock()
 			for hash, work := range a.work {
-				if time.Since(work.createdAt) > 7*(12*time.Second) {
+				if time.Since(work.CreatedAt) > 7*(12*time.Second) {
 					delete(a.work, hash)
 				}
 			}
@@ -192,7 +192,7 @@ func (a *RemoteAgent) loop(workCh chan *Work, quitCh chan struct{}) {
 
 			a.hashrateMu.Lock()
 			for id, hashrate := range a.hashrate {
-				if time.Since(hashrate.ping) > 10*time.Second {
+				if time.Since(hashrate.Ping) > 10*time.Second {
 					delete(a.hashrate, id)
 				}
 			}
