@@ -813,6 +813,12 @@
 			"revisionTime": "2017-04-30T22:20:11Z"
 		},
 		{
+			"checksumSHA1": "aAY8+n6+yHJnGnjRlGoa2xwCJ18=",
+			"path": "github.com/karalabe/hid",
+			"revision": "2b4488a37358b7283de4f9622553e85ebbe73125",
+			"revisionTime": "2018-04-20T08:12:45Z"
+		},
+		{
 			"checksumSHA1": "7hln62oZPZmyqEmgXaybf9WxQ7A=",
 			"path": "github.com/maruel/panicparse/stack",
 			"revision": "ad661195ed0e88491e0f14be6613304e3b1141d6",
