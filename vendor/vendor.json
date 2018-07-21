@@ -351,6 +351,12 @@
 			"revisionTime": "2018-03-28T12:35:41Z"
 		},
 		{
+			"checksumSHA1": "LS/Qn4CAVXw3zDAiURIS9LIvKxg=",
+			"path": "github.com/ethereum/go-ethereum/crypto/secp256k1",
+			"revision": "a095b84ec5a35cb3432380cc677d4e244b4a137f",
+			"revisionTime": "2018-03-28T12:35:41Z"
+		},
+		{
 			"checksumSHA1": "pQzUVRi0z/3Z4FpRyExSg1ROLSA=",
 			"path": "github.com/ethereum/go-ethereum/crypto/sha3",
 			"revision": "a095b84ec5a35cb3432380cc677d4e244b4a137f",
