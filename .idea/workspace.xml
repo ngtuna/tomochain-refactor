@@ -15,16 +15,25 @@
         <entry file="file://$PROJECT_DIR$/core/blockchain.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="1065">
-              <caret line="96" column="13" lean-forward="true" selection-start-line="96" selection-start-column="5" selection-end-line="96" selection-end-column="18" />
+              <caret line="96" column="13" selection-start-line="96" selection-start-column="5" selection-end-line="96" selection-end-column="18" />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="backend.go" pinned="false" current-in-tab="true">
+      <file leaf-file-name="backend.go" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/eth/backend.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="607">
-              <caret line="489" lean-forward="true" selection-start-line="489" selection-end-line="489" />
+              <caret line="489" selection-start-line="489" selection-end-line="489" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="bugcmd.go" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/cmd/tomo/bugcmd.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="525">
+              <caret line="35" column="48" selection-start-line="35" selection-start-column="40" selection-end-line="35" selection-end-column="48" />
             </state>
           </provider>
         </entry>
@@ -33,19 +42,10 @@
         <entry file="file://$PROJECT_DIR$/core/headerchain.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="891">
-              <caret line="444" lean-forward="true" selection-start-line="444" selection-end-line="444" />
+              <caret line="444" selection-start-line="444" selection-end-line="444" />
               <folding>
                 <element signature="e#807#1247#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="state_processor.go" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/state_processor.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="592">
-              <caret line="128" selection-start-line="128" selection-end-line="128" />
             </state>
           </provider>
         </entry>
@@ -54,7 +54,7 @@
         <entry file="file://$PROJECT_DIR$/core/block_validator.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="703">
-              <caret line="47" lean-forward="true" selection-start-line="47" selection-end-line="47" />
+              <caret line="47" selection-start-line="47" selection-end-line="47" />
               <folding>
                 <element signature="e#807#1043#0" expanded="true" />
               </folding>
@@ -66,7 +66,7 @@
         <entry file="file://$PROJECT_DIR$/eth/api.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="607">
-              <caret line="474" lean-forward="true" selection-start-line="474" selection-end-line="474" />
+              <caret line="474" selection-start-line="474" selection-end-line="474" />
               <folding>
                 <element signature="e#806#1436#0" expanded="true" />
               </folding>
@@ -78,7 +78,7 @@
         <entry file="file://$PROJECT_DIR$/eth/api_backend.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="227">
-              <caret line="129" column="33" lean-forward="true" selection-start-line="129" selection-start-column="33" selection-end-line="129" selection-end-column="33" />
+              <caret line="129" column="33" selection-start-line="129" selection-start-column="33" selection-end-line="129" selection-end-column="33" />
             </state>
           </provider>
         </entry>
@@ -87,7 +87,7 @@
         <entry file="file://$PROJECT_DIR$/eth/api_tracer.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="607">
-              <caret line="601" lean-forward="true" selection-start-line="601" selection-end-line="601" />
+              <caret line="601" selection-start-line="601" selection-end-line="601" />
               <folding>
                 <element signature="e#806#1495#0" expanded="true" />
               </folding>
@@ -104,7 +104,7 @@
         <entry file="file://$PROJECT_DIR$/core/evm.go">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="306">
-              <caret line="47" column="22" lean-forward="true" selection-start-line="47" selection-start-column="22" selection-end-line="47" selection-end-column="22" />
+              <caret line="47" column="22" selection-start-line="47" selection-start-column="22" selection-end-line="47" selection-end-column="22" />
             </state>
           </provider>
         </entry>
@@ -260,27 +260,6 @@
             </path>
             <path>
               <item name="tomochain" type="b2602c69:ProjectViewProjectNode" />
-              <item name="tomochain" type="462c0819:PsiDirectoryNode" />
-              <item name="core" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="tomochain" type="b2602c69:ProjectViewProjectNode" />
-              <item name="tomochain" type="462c0819:PsiDirectoryNode" />
-              <item name="eth" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="tomochain" type="b2602c69:ProjectViewProjectNode" />
-              <item name="tomochain" type="462c0819:PsiDirectoryNode" />
-              <item name="eth" type="462c0819:PsiDirectoryNode" />
-              <item name="fetcher" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="tomochain" type="b2602c69:ProjectViewProjectNode" />
-              <item name="tomochain" type="462c0819:PsiDirectoryNode" />
-              <item name="miner" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="tomochain" type="b2602c69:ProjectViewProjectNode" />
               <item name="External Libraries" type="cb654da1:ExternalLibrariesNode" />
             </path>
             <path>
@@ -373,13 +352,6 @@
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/les/server.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-173">
-          <caret line="31" column="13" selection-start-line="31" selection-start-column="5" selection-end-line="31" selection-end-column="17" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/eth/bloombits.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="681">
@@ -693,7 +665,7 @@
     <entry file="file://$PROJECT_DIR$/core/headerchain.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="891">
-          <caret line="444" lean-forward="true" selection-start-line="444" selection-end-line="444" />
+          <caret line="444" selection-start-line="444" selection-end-line="444" />
           <folding>
             <element signature="e#807#1247#0" expanded="true" />
           </folding>
@@ -703,21 +675,21 @@
     <entry file="file://$PROJECT_DIR$/core/evm.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="306">
-          <caret line="47" column="22" lean-forward="true" selection-start-line="47" selection-start-column="22" selection-end-line="47" selection-end-column="22" />
+          <caret line="47" column="22" selection-start-line="47" selection-start-column="22" selection-end-line="47" selection-end-column="22" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/core/blockchain.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1065">
-          <caret line="96" column="13" lean-forward="true" selection-start-line="96" selection-start-column="5" selection-end-line="96" selection-end-column="18" />
+          <caret line="96" column="13" selection-start-line="96" selection-start-column="5" selection-end-line="96" selection-end-column="18" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/core/block_validator.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="703">
-          <caret line="47" lean-forward="true" selection-start-line="47" selection-end-line="47" />
+          <caret line="47" selection-start-line="47" selection-end-line="47" />
           <folding>
             <element signature="e#807#1043#0" expanded="true" />
           </folding>
@@ -730,7 +702,7 @@
     <entry file="file://$PROJECT_DIR$/eth/api.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="607">
-          <caret line="474" lean-forward="true" selection-start-line="474" selection-end-line="474" />
+          <caret line="474" selection-start-line="474" selection-end-line="474" />
           <folding>
             <element signature="e#806#1436#0" expanded="true" />
           </folding>
@@ -740,14 +712,14 @@
     <entry file="file://$PROJECT_DIR$/eth/api_backend.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="227">
-          <caret line="129" column="33" lean-forward="true" selection-start-line="129" selection-start-column="33" selection-end-line="129" selection-end-column="33" />
+          <caret line="129" column="33" selection-start-line="129" selection-start-column="33" selection-end-line="129" selection-end-column="33" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/eth/api_tracer.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="607">
-          <caret line="601" lean-forward="true" selection-start-line="601" selection-end-line="601" />
+          <caret line="601" selection-start-line="601" selection-end-line="601" />
           <folding>
             <element signature="e#806#1495#0" expanded="true" />
           </folding>
@@ -757,7 +729,14 @@
     <entry file="file://$PROJECT_DIR$/eth/backend.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="607">
-          <caret line="489" lean-forward="true" selection-start-line="489" selection-end-line="489" />
+          <caret line="489" selection-start-line="489" selection-end-line="489" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/cmd/tomo/bugcmd.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="525">
+          <caret line="35" column="48" selection-start-line="35" selection-start-column="40" selection-end-line="35" selection-end-column="48" />
         </state>
       </provider>
     </entry>
