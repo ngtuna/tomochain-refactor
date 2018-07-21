@@ -55,6 +55,7 @@ import (
 	"github.com/tomochain/tomochain/configs"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	tomoCore "github.com/tomochain/tomochain/core"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
 )
 
 type TomoChain struct {
@@ -149,14 +150,14 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 		return nil, genesisErr
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
-	engine := eth.CreateConsensusEngine(ctx, &config.Ethash, chainConfig, chainDb)
+	engine := CreateConsensusEngine(ctx, &config.Ethash, chainConfig, chainDb)
 	tomoChain := &TomoChain{
 		Config:         config,
 		ChainDb:        chainDb,
 		ChainConfig:    chainConfig,
 		EventMux:       ctx.EventMux,
 		AccountManager: ctx.AccountManager,
-		Engine:         engine.(consensus.Engine),
+		Engine:         engine,
 		ShutdownChan:   make(chan bool),
 		NetworkID:      config.NetworkId,
 		GasPrice:       config.GasPrice,
@@ -486,4 +487,35 @@ func (s *TomoChain) Start(srvr *p2p.Server) error {
 		s.LesServer.Start(srvr)
 	}
 	return nil
+}
+
+// CreateConsensusEngine creates the required type of consensus GetEngine instance for an Ethereum service
+func CreateConsensusEngine(ctx *node.ServiceContext, config *ethash.Config, chainConfig *params.ChainConfig, db ethdb.Database) consensus.Engine {
+	// If proof-of-authority is requested, set it up
+	//if chainConfig.Clique != nil {
+	return clique.New(chainConfig.Clique, db)
+	//}
+	//// Otherwise assume proof-of-work
+	//switch {
+	//case config.PowMode == ethash.ModeFake:
+	//	log.Warn("Ethash used in fake mode")
+	//	return ethash.NewFaker()
+	//case config.PowMode == ethash.ModeTest:
+	//	log.Warn("Ethash used in test mode")
+	//	return ethash.NewTester()
+	//case config.PowMode == ethash.ModeShared:
+	//	log.Warn("Ethash used in shared mode")
+	//	return ethash.NewShared()
+	//default:
+	//	engine := ethash.New(ethash.Config{
+	//		CacheDir:       ctx.ResolvePath(config.CacheDir),
+	//		CachesInMem:    config.CachesInMem,
+	//		CachesOnDisk:   config.CachesOnDisk,
+	//		DatasetDir:     config.DatasetDir,
+	//		DatasetsInMem:  config.DatasetsInMem,
+	//		DatasetsOnDisk: config.DatasetsOnDisk,
+	//	})
+	//	engine.SetThreads(-1) // Disable CPU mining
+	//	return engine
+	//}
 }
