@@ -33,12 +33,15 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/eth"
+	"github.com/tomochain/tomochain/ethapi"
+
+	tomoCore "github.com/tomochain/tomochain/core"
 )
 
 // TraceChain returns the structured logs created during the execution of EVM
@@ -145,7 +148,7 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 				// Trace all the transactions contained within
 				for i, tx := range task.Block.Transactions() {
 					msg, _ := tx.AsMessage(signer)
-					vmctx := core.NewEVMContext(msg, task.Block.Header(), api.eth.Blockchain, nil)
+					vmctx := tomoCore.NewEVMContext(msg, task.Block.Header(), api.eth.Blockchain, nil)
 
 					res, err := api.traceTx(ctx, msg, vmctx, task.Statedb, config)
 					if err != nil {
@@ -376,7 +379,7 @@ func (api *PrivateDebugAPI) traceBlock(ctx context.Context, block *types.Block, 
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
 				msg, _ := txs[task.Index].AsMessage(signer)
-				vmctx := core.NewEVMContext(msg, block.Header(), api.eth.Blockchain, nil)
+				vmctx := tomoCore.NewEVMContext(msg, block.Header(), api.eth.Blockchain, nil)
 
 				res, err := api.traceTx(ctx, msg, vmctx, task.Statedb, config)
 				if err != nil {
@@ -395,7 +398,7 @@ func (api *PrivateDebugAPI) traceBlock(ctx context.Context, block *types.Block, 
 
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(signer)
-		vmctx := core.NewEVMContext(msg, block.Header(), api.eth.Blockchain, nil)
+		vmctx := tomoCore.NewEVMContext(msg, block.Header(), api.eth.Blockchain, nil)
 
 		vmenv := vm.NewEVM(vmctx, statedb, api.config, vm.Config{})
 		if _, _, _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(msg.Gas())); err != nil {
@@ -583,7 +586,7 @@ func (api *PrivateDebugAPI) computeTxEnv(blockHash common.Hash, txIndex int, ree
 	for idx, tx := range block.Transactions() {
 		// Assemble the transaction call message and return if the requested offset
 		msg, _ := tx.AsMessage(signer)
-		context := core.NewEVMContext(msg, block.Header(), api.eth.Blockchain, nil)
+		context := tomoCore.NewEVMContext(msg, block.Header(), api.eth.Blockchain, nil)
 		if idx == txIndex {
 			return msg, context, statedb, nil
 		}

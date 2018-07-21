@@ -232,7 +232,7 @@ func (api *PrivateAdminAPI) ExportChain(file string) (bool, error) {
 	return true, nil
 }
 
-func hasAllBlocks(chain *core.BlockChain, bs []*types.Block) bool {
+func HasAllBlocks(chain *core.BlockChain, bs []*types.Block) bool {
 	for _, b := range bs {
 		if !chain.HasBlock(b.Hash(), b.NumberU64()) {
 			return false
@@ -278,7 +278,7 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 			break
 		}
 
-		if hasAllBlocks(api.eth.BlockChain(), blocks) {
+		if HasAllBlocks(api.eth.BlockChain(), blocks) {
 			blocks = blocks[:0]
 			continue
 		}
@@ -355,13 +355,13 @@ func (api *PrivateDebugAPI) GetBadBlocks(ctx context.Context) ([]core.BadBlockAr
 
 // StorageRangeResult is the result of a debug_storageRangeAt API call.
 type StorageRangeResult struct {
-	Storage storageMap   `json:"storage"`
+	Storage StorageMap   `json:"storage"`
 	NextKey *common.Hash `json:"nextKey"` // nil if Storage includes the last key in the trie.
 }
 
-type storageMap map[common.Hash]storageEntry
+type StorageMap map[common.Hash]StorageEntry
 
-type storageEntry struct {
+type StorageEntry struct {
 	Key   *common.Hash `json:"key"`
 	Value common.Hash  `json:"value"`
 }
@@ -381,13 +381,13 @@ func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common
 
 func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeResult, error) {
 	it := trie.NewIterator(st.NodeIterator(start))
-	result := StorageRangeResult{Storage: storageMap{}}
+	result := StorageRangeResult{Storage: StorageMap{}}
 	for i := 0; i < maxResult && it.Next(); i++ {
 		_, content, _, err := rlp.Split(it.Value)
 		if err != nil {
 			return StorageRangeResult{}, err
 		}
-		e := storageEntry{Value: common.BytesToHash(content)}
+		e := StorageEntry{Value: common.BytesToHash(content)}
 		if preimage := st.GetKey(it.Key); preimage != nil {
 			preimage := common.BytesToHash(preimage)
 			e.Key = &preimage

@@ -20,45 +20,45 @@ import "fmt"
 
 // Memory implements a simple memory model for the ethereum virtual machine.
 type Memory struct {
-	store       []byte
-	lastGasCost uint64
+	Store       []byte
+	LastGasCost uint64
 }
 
 func NewMemory() *Memory {
 	return &Memory{}
 }
 
-// Set sets offset + size to value
+// Set sets offset + size to Value
 func (m *Memory) Set(offset, size uint64, value []byte) {
-	// length of store may never be less than offset + size.
-	// The store should be resized PRIOR to setting the memory
-	if size > uint64(len(m.store)) {
-		panic("INVALID memory: store empty")
+	// length of Store may never be less than offset + size.
+	// The Store should be resized PRIOR to setting the memory
+	if size > uint64(len(m.Store)) {
+		panic("INVALID memory: Store empty")
 	}
 
 	// It's possible the offset is greater than 0 and size equals 0. This is because
 	// the calcMemSize (common.go) could potentially return 0 when size is zero (NO-OP)
 	if size > 0 {
-		copy(m.store[offset:offset+size], value)
+		copy(m.Store[offset:offset+size], value)
 	}
 }
 
 // Resize resizes the memory to size
 func (m *Memory) Resize(size uint64) {
 	if uint64(m.Len()) < size {
-		m.store = append(m.store, make([]byte, size-uint64(m.Len()))...)
+		m.Store = append(m.Store, make([]byte, size-uint64(m.Len()))...)
 	}
 }
 
-// Get returns offset + size as a new slice
+// Get Returns offset + size as a new slice
 func (self *Memory) Get(offset, size int64) (cpy []byte) {
 	if size == 0 {
 		return nil
 	}
 
-	if len(self.store) > int(offset) {
+	if len(self.Store) > int(offset) {
 		cpy = make([]byte, size)
-		copy(cpy, self.store[offset:offset+size])
+		copy(cpy, self.Store[offset:offset+size])
 
 		return
 	}
@@ -66,35 +66,35 @@ func (self *Memory) Get(offset, size int64) (cpy []byte) {
 	return
 }
 
-// GetPtr returns the offset + size
+// GetPtr Returns the offset + size
 func (self *Memory) GetPtr(offset, size int64) []byte {
 	if size == 0 {
 		return nil
 	}
 
-	if len(self.store) > int(offset) {
-		return self.store[offset : offset+size]
+	if len(self.Store) > int(offset) {
+		return self.Store[offset : offset+size]
 	}
 
 	return nil
 }
 
-// Len returns the length of the backing slice
+// Len Returns the length of the backing slice
 func (m *Memory) Len() int {
-	return len(m.store)
+	return len(m.Store)
 }
 
-// Data returns the backing slice
+// Data Returns the backing slice
 func (m *Memory) Data() []byte {
-	return m.store
+	return m.Store
 }
 
 func (m *Memory) Print() {
-	fmt.Printf("### mem %d bytes ###\n", len(m.store))
-	if len(m.store) > 0 {
+	fmt.Printf("### mem %d bytes ###\n", len(m.Store))
+	if len(m.Store) > 0 {
 		addr := 0
-		for i := 0; i+32 <= len(m.store); i += 32 {
-			fmt.Printf("%03d: % x\n", addr, m.store[i:i+32])
+		for i := 0; i+32 <= len(m.Store); i += 32 {
+			fmt.Printf("%03d: % x\n", addr, m.Store[i:i+32])
 			addr++
 		}
 	} else {

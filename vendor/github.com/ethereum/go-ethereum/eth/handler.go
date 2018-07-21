@@ -283,7 +283,7 @@ func (pm *ProtocolManager) Handle(p *Peer) error {
 	}
 	// Propagate existing transactions. new transactions appearing
 	// after this will be sent via broadcasts.
-	pm.syncTransactions(p)
+	pm.SyncTransactions(p)
 
 	// If we're DAO hard-fork aware, validate any remote Peer with regard to the hard-fork
 	if daoBlock := pm.Chainconfig.DAOForkBlock; daoBlock != nil {

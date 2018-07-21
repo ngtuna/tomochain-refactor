@@ -35,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/eth"
-	ethconsensus "github.com/ethereum/go-ethereum/consensus"
 	"github.com/tomochain/tomochain/eth/fetcher"
 
 	"github.com/tomochain/tomochain/contracts"
@@ -51,7 +50,11 @@ import (
 	"github.com/tomochain/tomochain/miner"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/core/state"
+	tomocommon "github.com/tomochain/tomochain/common"
+	"github.com/tomochain/tomochain/configs"
 	"github.com/ethereum/go-ethereum/eth/filters"
+	tomoCore "github.com/tomochain/tomochain/core"
 )
 
 type TomoChain struct {
@@ -63,7 +66,7 @@ type TomoChain struct {
 
 	// Handlers
 	TxPool          *core.TxPool
-	Blockchain      *core.BlockChain
+	Blockchain      *tomoCore.TomoBlockChain
 	ProtocolManager *TomoProtocolManager
 	LesServer       eth.LesServer
 
@@ -92,9 +95,10 @@ type TomoChain struct {
 	IPCEndpoint   string
 	Client        *ethclient.Client // Global ipc client instance.
 }
-func (s *TomoChain) StopMining()         { s.Miner.Stop() }
+
+func (s *TomoChain) StopMining()                          { s.Miner.Stop() }
 func (s *TomoChain) GetAccountManager() *accounts.Manager { return s.AccountManager }
-func (s *TomoChain) BlockChain() *core.BlockChain         { return s.Blockchain }
+func (s *TomoChain) BlockChain() *tomoCore.TomoBlockChain { return s.Blockchain }
 func (s *TomoChain) GetTxPool() *core.TxPool              { return s.TxPool }
 func (s *TomoChain) GetEventMux() *event.TypeMux          { return s.EventMux }
 func (s *TomoChain) GetEngine() consensus.Engine          { return s.Engine }
@@ -176,7 +180,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}
 	)
-	tomoChain.Blockchain, err = core.NewBlockChain(chainDb, cacheConfig, tomoChain.ChainConfig, tomoChain.Engine.(ethconsensus.Engine), vmConfig)
+	tomoChain.Blockchain, err = tomoCore.NewBlockChain(chainDb, cacheConfig, tomoChain.ChainConfig, tomoChain.Engine.(consensus.Engine), vmConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -228,40 +232,40 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*TomoChain, error) {
 		}
 		fetcher.SetImportedHook(tomoChain.ProtocolManager.Fetcher, importedHook)
 
-		// Hook reward for clique validator.
-		//c.HookReward = func(chain consensus.ChainReader, state *state.StateDB, header *types.Header) error {
-		//	client, err := tomoChain.GetClient()
-		//	if err != nil {
-		//		log.Error("Fail to connect IPC client for blockSigner", "error", err)
-		//
-		//		return err
-		//	}
-		//
-		//	number := header.Number.Uint64()
-		//	rCheckpoint := utils.Config.RewardConfig.RewardCheckpoint
-		//	if number > 0 && number-rCheckpoint > 0 {
-		//		// Get signers in blockSigner smartcontract.
-		//		addr := common.HexToAddress(tomocommon.BlockSigners)
-		//		chainReward := new(big.Int).SetUint64(utils.Config.RewardConfig.Reward * params.Ether)
-		//		totalSigner := new(uint64)
-		//		signers, err := contracts.GetRewardForCheckpoint(addr, number, rCheckpoint, client, totalSigner)
-		//		if err != nil {
-		//			log.Error("Fail to get signers for reward checkpoint", "error", err)
-		//		}
-		//		rewardSigners, err := contracts.CalculateReward(chainReward, signers, *totalSigner)
-		//		if err != nil {
-		//			log.Error("Fail to calculate reward for signers", "error", err)
-		//		}
-		//		// Add reward for signers.
-		//		if len(signers) > 0 {
-		//			for signer, calcReward := range rewardSigners {
-		//				state.AddBalance(signer, calcReward)
-		//			}
-		//		}
-		//	}
-		//
-		//	return nil
-		//}
+		//Hook reward for clique validator.
+		c.HookReward = func(chain consensus.ChainReader, state *state.StateDB, header *types.Header) error {
+			client, err := tomoChain.GetClient()
+			if err != nil {
+				log.Error("Fail to connect IPC client for blockSigner", "error", err)
+
+				return err
+			}
+
+			number := header.Number.Uint64()
+			rCheckpoint := configs.Config.RewardConfig.RewardCheckpoint
+			if number > 0 && number-rCheckpoint > 0 {
+				// Get signers in blockSigner smartcontract.
+				addr := common.HexToAddress(tomocommon.BlockSigners)
+				chainReward := new(big.Int).SetUint64(configs.Config.RewardConfig.Reward * params.Ether)
+				totalSigner := new(uint64)
+				signers, err := contracts.GetRewardForCheckpoint(addr, number, rCheckpoint, client, totalSigner)
+				if err != nil {
+					log.Error("Fail to get signers for reward checkpoint", "error", err)
+				}
+				rewardSigners, err := contracts.CalculateReward(chainReward, signers, *totalSigner)
+				if err != nil {
+					log.Error("Fail to calculate reward for signers", "error", err)
+				}
+				// Add reward for signers.
+				if len(signers) > 0 {
+					for signer, calcReward := range rewardSigners {
+						state.AddBalance(signer, calcReward)
+					}
+				}
+			}
+
+			return nil
+		}
 	}
 
 	return tomoChain, nil
@@ -351,7 +355,6 @@ func (s *TomoChain) GetClient() (*ethclient.Client, error) {
 	return s.Client, nil
 }
 
-
 func (s *TomoChain) AddLesServer(ls eth.LesServer) {
 	s.LesServer = ls
 	ls.SetBloomBitsIndexer(s.BloomIndexer)
@@ -363,7 +366,6 @@ func (s *TomoChain) Protocols() []p2p.Protocol {
 	}
 	return append(s.ProtocolManager.SubProtocols, s.LesServer.Protocols()...)
 }
-
 
 // APIs returns the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
@@ -378,12 +380,12 @@ func (s *TomoChain) APIs() []rpc.API {
 		{
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   eth.NewPublicEthereumAPI(s),
+			Service:   NewPublicEthereumAPI(s),
 			Public:    true,
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   eth.NewPublicMinerAPI(s),
+			Service:   NewPublicMinerAPI(s),
 			Public:    true,
 		}, {
 			Namespace: "eth",
@@ -393,7 +395,7 @@ func (s *TomoChain) APIs() []rpc.API {
 		}, {
 			Namespace: "Miner",
 			Version:   "1.0",
-			Service:   eth.NewPrivateMinerAPI(s),
+			Service:   NewPrivateMinerAPI(s),
 			Public:    false,
 		}, {
 			Namespace: "eth",
@@ -403,17 +405,19 @@ func (s *TomoChain) APIs() []rpc.API {
 		}, {
 			Namespace: "admin",
 			Version:   "1.0",
-			Service:   eth.NewPrivateAdminAPI(s),
+			Service:   NewPrivateAdminAPI(s),
 		}, {
 			Namespace: "debug",
 			Version:   "1.0",
-			Service:   eth.NewPublicDebugAPI(s),
+			Service:   NewPublicDebugAPI(s),
 			Public:    true,
-		}, {
+		},
+		{
 			Namespace: "debug",
 			Version:   "1.0",
-			Service:   eth.NewPrivateDebugAPI(s.ChainConfig, s),
-		}, {
+			Service:   NewPrivateDebugAPI(s.ChainConfig, s),
+		},
+		{
 			Namespace: "net",
 			Version:   "1.0",
 			Service:   s.NetRPCService,
@@ -422,15 +426,8 @@ func (s *TomoChain) APIs() []rpc.API {
 	}...)
 }
 
-
-
-
-
 func (s *TomoChain) IsMining() bool         { return s.Miner.Mining() }
 func (s *TomoChain) GetMiner() *miner.Miner { return s.Miner }
-
-
-
 
 func (s *TomoChain) StartMining(local bool) error {
 	eb, err := s.GetEtherbase()
@@ -457,8 +454,6 @@ func (s *TomoChain) StartMining(local bool) error {
 	return nil
 }
 
-
-
 // set in js console via admin interface or wrapper from cli flags
 func (self *TomoChain) SetEtherbase(etherbase common.Address) {
 	self.Lock.Lock()
@@ -467,8 +462,6 @@ func (self *TomoChain) SetEtherbase(etherbase common.Address) {
 
 	self.Miner.SetEtherbase(etherbase)
 }
-
-
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
@@ -494,4 +487,3 @@ func (s *TomoChain) Start(srvr *p2p.Server) error {
 	}
 	return nil
 }
-

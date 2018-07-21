@@ -68,7 +68,7 @@ func (b *BlockGen) SetCoinbase(addr common.Address) {
 	b.gasPool = new(GasPool).AddGas(b.header.GasLimit)
 }
 
-// SetExtra sets the extra data field of the generated block.
+// SetExtra sets the extra Data field of the generated block.
 func (b *BlockGen) SetExtra(data []byte) {
 	b.header.Extra = data
 }
@@ -77,7 +77,7 @@ func (b *BlockGen) SetExtra(data []byte) {
 // been set, the block's coinbase is set to the zero address.
 //
 // AddTx panics if the transaction cannot be executed. In addition to
-// the protocol-imposed limitations (gas limit, etc.), there are some
+// the protocol-imposed limitations (Gas limit, etc.), there are some
 // further limitations on the content of transactions that can be
 // added. Notably, contract code relying on the BLOCKHASH instruction
 // will panic during execution.
@@ -89,7 +89,7 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 // been set, the block's coinbase is set to the zero address.
 //
 // AddTxWithChain panics if the transaction cannot be executed. In addition to
-// the protocol-imposed limitations (gas limit, etc.), there are some
+// the protocol-imposed limitations (Gas limit, etc.), there are some
 // further limitations on the content of transactions that can be
 // added. If contract code relies on the BLOCKHASH instruction,
 // the block in Chain will be returned.
@@ -160,7 +160,7 @@ func (b *BlockGen) OffsetTime(seconds int64) {
 
 // GenerateChain creates a Chain of n blocks. The first block's
 // parent will be the provided parent. Db is used to store
-// intermediate states and should contain the parent's state trie.
+// intermediate states and should contain the parent's State trie.
 //
 // The generator function is called with a new block generator for
 // every block. Any transactions and uncles added to the generator
@@ -184,7 +184,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: blockchain, statedb: statedb, config: config, engine: engine}
 		b.header = makeHeader(b.chainReader, parent, statedb, b.engine)
 
-		// Mutate the state and block according to any hard-fork specs
+		// Mutate the State and block according to any hard-fork specs
 		if daoBlock := config.DAOForkBlock; daoBlock != nil {
 			limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
 			if b.header.Number.Cmp(daoBlock) >= 0 && b.header.Number.Cmp(limit) < 0 {
@@ -203,10 +203,10 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 
 		if b.engine != nil {
 			block, _ := b.engine.Finalize(b.chainReader, b.header, statedb, b.txs, b.uncles, b.receipts)
-			// Write state changes to Db
+			// Write State changes to Db
 			root, err := statedb.Commit(config.IsEIP158(b.header.Number))
 			if err != nil {
-				panic(fmt.Sprintf("state write error: %v", err))
+				panic(fmt.Sprintf("State write error: %v", err))
 			}
 			if err := statedb.Database().TrieDB().Commit(root, false); err != nil {
 				panic(fmt.Sprintf("trie write error: %v", err))

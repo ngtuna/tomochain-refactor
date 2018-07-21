@@ -71,7 +71,7 @@ type distReq struct {
 }
 
 // newRequestDistributor creates a new request distributor
-func newRequestDistributor(peers *peerSet, stopChn chan struct{}) *requestDistributor {
+func newRequestDistributor(peers *PeerSet, stopChn chan struct{}) *requestDistributor {
 	d := &requestDistributor{
 		reqQueue: list.New(),
 		loopChn:  make(chan struct{}, 2),

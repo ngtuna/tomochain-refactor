@@ -256,9 +256,9 @@ func (cw *contractWrapper) pushObject(vm *duktape.Context) {
 	})
 	vm.PutPropString(obj, "getAddress")
 
-	// Push the wrapper for contract.Value
+	// Push the wrapper for contract.GetValue
 	vm.PushGoFunction(func(ctx *duktape.Context) int {
-		pushBigInt(cw.contract.Value(), ctx)
+		pushBigInt(cw.contract.GetValue(), ctx)
 		return 1
 	})
 	vm.PutPropString(obj, "getValue")

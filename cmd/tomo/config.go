@@ -35,6 +35,8 @@ import (
 	"github.com/naoina/toml"
 	"github.com/tomochain/tomochain/cmd/utils"
 	"github.com/ethereum/go-ethereum/node"
+
+	"github.com/tomochain/tomochain/configs"
 )
 
 var (
@@ -75,7 +77,7 @@ type ethstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
-func loadConfig(file string, cfg *TomoConfig) error {
+func loadConfig(file string, cfg *configs.TomoConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -100,9 +102,9 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-func makeConfigNode(ctx *cli.Context) (*node.Node, TomoConfig) {
+func makeConfigNode(ctx *cli.Context) (*node.Node, configs.TomoConfig) {
 	// Load defaults.
-	cfg := TomoConfig{
+	cfg := configs.TomoConfig{
 		Eth:       eth.DefaultConfig,
 		Shh:       whisper.DefaultConfig,
 		Node:      defaultNodeConfig(),
@@ -115,7 +117,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, TomoConfig) {
 			utils.Fatalf("%v", err)
 		}
 	}
-	Config = cfg
+	configs.Config = cfg
 	// Apply flags.
 	utils.SetNodeConfig(ctx, &cfg.Node)
 	stack, err := node.New(&cfg.Node)

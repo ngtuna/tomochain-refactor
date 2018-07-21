@@ -41,7 +41,7 @@ import (
 
 var errGenesisNoConfig = errors.New("genesis has no Chain configuration")
 
-// Genesis specifies the header fields, state of a genesis block. It also defines hard
+// Genesis specifies the header fields, State of a genesis block. It also defines hard
 // fork switch-over blocks through the Chain configuration.
 type Genesis struct {
 	Config     *params.ChainConfig `json:"Config"`
@@ -61,7 +61,7 @@ type Genesis struct {
 	ParentHash common.Hash `json:"parentHash"`
 }
 
-// GenesisAlloc specifies the initial state that is part of the genesis block.
+// GenesisAlloc specifies the initial State that is part of the genesis block.
 type GenesisAlloc map[common.Address]GenesisAccount
 
 func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
@@ -76,7 +76,7 @@ func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// GenesisAccount is an account in the state of the genesis block.
+// GenesisAccount is an account in the State of the genesis block.
 type GenesisAccount struct {
 	Code       []byte                      `json:"code,omitempty"`
 	Storage    map[common.Hash]common.Hash `json:"storage,omitempty"`
@@ -112,12 +112,12 @@ type storageJSON common.Hash
 func (h *storageJSON) UnmarshalText(text []byte) error {
 	text = bytes.TrimPrefix(text, []byte("0x"))
 	if len(text) > 64 {
-		return fmt.Errorf("too many hex characters in storage key/value %q", text)
+		return fmt.Errorf("too many hex characters in storage key/GetValue %q", text)
 	}
 	offset := len(h) - len(text)/2 // pad on the left
 	if _, err := hex.Decode(h[offset:], text); err != nil {
 		fmt.Println(err)
-		return fmt.Errorf("invalid hex storage key/value %q", text)
+		return fmt.Errorf("invalid hex storage key/GetValue %q", text)
 	}
 	return nil
 }
@@ -196,7 +196,7 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	// Check Config compatibility and write the Config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
 	height := GetBlockNumber(db, GetHeadHeaderHash(db))
-	if height == missingNumber {
+	if height == MissingNumber {
 		return newcfg, stored, fmt.Errorf("missing block number for head header hash")
 	}
 	compatErr := storedcfg.CheckCompatible(newcfg, height)
@@ -219,7 +219,7 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	}
 }
 
-// ToBlock creates the genesis block and writes state of a genesis specification
+// ToBlock creates the genesis block and writes State of a genesis specification
 // to the given database (or discards it if nil).
 func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if db == nil {
@@ -260,7 +260,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	return types.NewBlock(head, nil, nil, nil)
 }
 
-// Commit writes the block and state of a genesis specification to the database.
+// Commit writes the block and State of a genesis specification to the database.
 // The block is committed as the canonical head block.
 func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	block := g.ToBlock(db)
@@ -292,7 +292,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	return block, WriteChainConfig(db, block.Hash(), config)
 }
 
-// MustCommit writes the genesis block and state to Db, panicking on error.
+// MustCommit writes the genesis block and State to Db, panicking on error.
 // The block is committed as the canonical head block.
 func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 	block, err := g.Commit(db)

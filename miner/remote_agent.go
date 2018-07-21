@@ -35,13 +35,13 @@ type RemoteAgent struct {
 	mu sync.Mutex
 
 	quitCh   chan struct{}
-	workCh   chan *miner.Work
-	returnCh chan<- *miner.Result
+	workCh   chan *Work
+	returnCh chan<- *Result
 
 	chain       consensus.ChainReader
 	engine      consensus.Engine
-	currentWork *miner.Work
-	work        map[common.Hash]*miner.Work
+	currentWork *Work
+	work        map[common.Hash]*Work
 
 	hashrateMu sync.RWMutex
 	hashrate   map[common.Hash]miner.Hashrate
@@ -53,7 +53,7 @@ func NewRemoteAgent(chain consensus.ChainReader, engine consensus.Engine) *Remot
 	return &RemoteAgent{
 		chain:    chain,
 		engine:   engine,
-		work:     make(map[common.Hash]*miner.Work),
+		work:     make(map[common.Hash]*Work),
 		hashrate: make(map[common.Hash]miner.Hashrate),
 	}
 }
@@ -65,11 +65,11 @@ func (a *RemoteAgent) SubmitHashrate(id common.Hash, rate uint64) {
 	a.hashrate[id] = miner.Hashrate{time.Now(), rate}
 }
 
-func (a *RemoteAgent) Work() chan<- *miner.Work {
+func (a *RemoteAgent) Work() chan<- *Work {
 	return a.workCh
 }
 
-func (a *RemoteAgent) SetReturnCh(returnCh chan<- *miner.Result) {
+func (a *RemoteAgent) SetReturnCh(returnCh chan<- *Result) {
 	a.returnCh = returnCh
 }
 
@@ -78,7 +78,7 @@ func (a *RemoteAgent) Start() {
 		return
 	}
 	a.quitCh = make(chan struct{})
-	a.workCh = make(chan *miner.Work, 1)
+	a.workCh = make(chan *Work, 1)
 	go a.loop(a.workCh, a.quitCh)
 }
 
@@ -152,7 +152,7 @@ func (a *RemoteAgent) SubmitWork(nonce types.BlockNonce, mixDigest, hash common.
 	block := work.Block.WithSeal(result)
 
 	// Solutions seems to be valid, return to the miner and notify acceptance
-	a.returnCh <- &miner.Result{work, block}
+	a.returnCh <- &Result{work, block}
 	delete(a.work, hash)
 
 	return true
@@ -164,7 +164,7 @@ func (a *RemoteAgent) SubmitWork(nonce types.BlockNonce, mixDigest, hash common.
 // Note, the reason the work and quit channels are passed as parameters is because
 // RemoteAgent.Start() constantly recreates these channels, so the loop code cannot
 // assume data stability in these member fields.
-func (a *RemoteAgent) loop(workCh chan *miner.Work, quitCh chan struct{}) {
+func (a *RemoteAgent) loop(workCh chan *Work, quitCh chan struct{}) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 

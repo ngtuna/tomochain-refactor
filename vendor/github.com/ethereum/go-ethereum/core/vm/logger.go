@@ -56,7 +56,7 @@ type StructLog struct {
 	Pc         uint64                      `json:"pc"`
 	Op         OpCode                      `json:"op"`
 	Gas        uint64                      `json:"gas"`
-	GasCost    uint64                      `json:"gasCost"`
+	GasCost    uint64                      `json:"GasCost"`
 	Memory     []byte                      `json:"memory"`
 	MemorySize int                         `json:"memSize"`
 	Stack      []*big.Int                  `json:"stack"`
@@ -112,7 +112,7 @@ type StructLogger struct {
 	err           error
 }
 
-// NewStructLogger returns a new logger
+// NewStructLogger Returns a new logger
 func NewStructLogger(cfg *LogConfig) *StructLogger {
 	logger := &StructLogger{
 		changedValues: make(map[common.Address]Storage),
@@ -142,12 +142,12 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 		l.changedValues[contract.Address()] = make(Storage)
 	}
 
-	// capture SSTORE opcodes and determine the changed value and store
+	// capture SSTORE opcodes and determine the changed Value and Store
 	// it in the local storage container.
-	if op == SSTORE && stack.len() >= 2 {
+	if op == SSTORE && stack.Len() >= 2 {
 		var (
-			value   = common.BigToHash(stack.data[stack.len()-2])
-			address = common.BigToHash(stack.data[stack.len()-1])
+			value   = common.BigToHash(stack.data[stack.Len()-2])
+			address = common.BigToHash(stack.data[stack.Len()-1])
 		)
 		l.changedValues[contract.Address()][address] = value
 	}
@@ -187,16 +187,16 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 	return nil
 }
 
-// StructLogs returns the captured log entries.
+// StructLogs Returns the captured log entries.
 func (l *StructLogger) StructLogs() []StructLog { return l.logs }
 
-// Error returns the VM error captured by the trace.
+// Error Returns the VM error captured by the trace.
 func (l *StructLogger) Error() error { return l.err }
 
-// Output returns the VM return value captured by the trace.
+// Output Returns the VM return Value captured by the trace.
 func (l *StructLogger) Output() []byte { return l.output }
 
-// WriteTrace writes a formatted trace to the given writer
+// WriteTrace Writes a formatted trace to the given writer
 func WriteTrace(writer io.Writer, logs []StructLog) {
 	for _, log := range logs {
 		fmt.Fprintf(writer, "%-16spc=%08d gas=%v cost=%v", log.Op, log.Pc, log.Gas, log.GasCost)
@@ -225,7 +225,7 @@ func WriteTrace(writer io.Writer, logs []StructLog) {
 	}
 }
 
-// WriteLogs writes vm logs in a readable format to the given writer
+// WriteLogs Writes vm logs in a readable format to the given writer
 func WriteLogs(writer io.Writer, logs []*types.Log) {
 	for _, log := range logs {
 		fmt.Fprintf(writer, "LOG%d: %x bn=%d txi=%x\n", len(log.Topics), log.Address, log.BlockNumber, log.TxIndex)

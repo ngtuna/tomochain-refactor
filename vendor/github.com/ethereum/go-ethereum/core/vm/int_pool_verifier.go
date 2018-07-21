@@ -22,10 +22,10 @@ import "fmt"
 
 const verifyPool = true
 
-func verifyIntegerPool(ip *intPool) {
-	for i, item := range ip.pool.data {
+func verifyIntegerPool(ip *IntPool) {
+	for i, item := range ip.Pool.data {
 		if item.Cmp(checkVal) != 0 {
-			panic(fmt.Sprintf("%d'th item failed aggressive pool check. Value was modified", i))
+			panic(fmt.Sprintf("%d'th item failed aggressive Pool check. GetValue was modified", i))
 		}
 	}
 }

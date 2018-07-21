@@ -50,7 +50,7 @@ func (h *nonceHeap) Pop() interface{} {
 // txSortedMap is a nonce->transaction hash map with a heap based index to allow
 // iterating over the contents in a nonce-incrementing way.
 type txSortedMap struct {
-	items map[uint64]*types.Transaction // Hash map storing the transaction data
+	items map[uint64]*types.Transaction // Hash map storing the transaction Data
 	index *nonceHeap                    // Heap of nonces of All the stored transactions (non-strict mode)
 	cache types.Transactions            // Cache of the transactions already sorted
 }
@@ -173,7 +173,7 @@ func (m *txSortedMap) Remove(nonce uint64) bool {
 // removed from the list.
 //
 // Note, All transactions with nonces lower than start will also be returned to
-// prevent getting into and invalid state. This is not something that should ever
+// prevent getting into and invalid State. This is not something that should ever
 // happen but better to be self correcting than failing!
 func (m *txSortedMap) Ready(start uint64) types.Transactions {
 	// Short circuit if no transactions are available
@@ -246,16 +246,16 @@ func (l *txList) Overlaps(tx *types.Transaction) bool {
 // Add tries to insert a new transaction into the list, returning whether the
 // transaction was accepted, and if yes, any previous transaction it replaced.
 //
-// If the new transaction is accepted into the list, the lists' cost and gas
+// If the new transaction is accepted into the list, the lists' cost and Gas
 // thresholds are also potentially updated.
 func (l *txList) Add(tx *types.Transaction, priceBump uint64) (bool, *types.Transaction) {
 	// If there's an older better transaction, abort
 	old := l.txs.Get(tx.Nonce())
 	if old != nil {
 		threshold := new(big.Int).Div(new(big.Int).Mul(old.GasPrice(), big.NewInt(100+int64(priceBump))), big.NewInt(100))
-		// Have to ensure that the new gas price is higher than the old gas
+		// Have to ensure that the new Gas price is higher than the old Gas
 		// price as well as checking the percentage threshold to ensure that
-		// this is accurate for low (Wei-level) gas price replacements
+		// this is accurate for low (Wei-level) Gas price replacements
 		if old.GasPrice().Cmp(tx.GasPrice()) >= 0 || threshold.Cmp(tx.GasPrice()) > 0 {
 			return false, nil
 		}
@@ -278,7 +278,7 @@ func (l *txList) Forward(threshold uint64) types.Transactions {
 	return l.txs.Forward(threshold)
 }
 
-// Filter removes All transactions from the list with a cost or gas limit higher
+// Filter removes All transactions from the list with a cost or Gas limit higher
 // than the provided thresholds. Every removed transaction is returned for any
 // post-removal maintenance. Strict-mode invalidated transactions are also
 // returned.
@@ -340,7 +340,7 @@ func (l *txList) Remove(tx *types.Transaction) (bool, types.Transactions) {
 // removed from the list.
 //
 // Note, All transactions with nonces lower than start will also be returned to
-// prevent getting into and invalid state. This is not something that should ever
+// prevent getting into and invalid State. This is not something that should ever
 // happen but better to be self correcting than failing!
 func (l *txList) Ready(start uint64) types.Transactions {
 	return l.txs.Ready(start)
@@ -405,7 +405,7 @@ func (l *txPricedList) Put(tx *types.Transaction) {
 }
 
 // Removed notifies the prices transaction list that an old transaction dropped
-// from the pool. The list will just keep a counter of stale objects and update
+// from the pool. The list will just keep a counter of stale objects and Update
 // the heap if a large enough ratio of transactions go stale.
 func (l *txPricedList) Removed() {
 	// Bump the stale counter, but exit if still too low (< 25%)

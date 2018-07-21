@@ -50,7 +50,7 @@ var (
 	// one present in the local Chain.
 	ErrNonceTooLow = errors.New("nonce too low")
 
-	// ErrUnderpriced is returned if a transaction's gas price is below the minimum
+	// ErrUnderpriced is returned if a transaction's Gas price is below the minimum
 	// configured for the transaction pool.
 	ErrUnderpriced = errors.New("transaction underpriced")
 
@@ -60,24 +60,24 @@ var (
 
 	// ErrInsufficientFunds is returned if the total cost of executing a transaction
 	// is higher than the balance of the user's account.
-	ErrInsufficientFunds = errors.New("insufficient funds for gas * price + value")
+	ErrInsufficientFunds = errors.New("insufficient funds for Gas * price + GetValue")
 
-	// ErrIntrinsicGas is returned if the transaction is specified to use less gas
+	// ErrIntrinsicGas is returned if the transaction is specified to use less Gas
 	// than required to start the invocation.
-	ErrIntrinsicGas = errors.New("intrinsic gas too low")
+	ErrIntrinsicGas = errors.New("intrinsic Gas too low")
 
-	// ErrGasLimit is returned if a transaction's requested gas limit exceeds the
+	// ErrGasLimit is returned if a transaction's requested Gas limit exceeds the
 	// maximum allowance of the current block.
-	ErrGasLimit = errors.New("exceeds block gas limit")
+	ErrGasLimit = errors.New("exceeds block Gas limit")
 
 	// ErrNegativeValue is a sanity error to ensure noone is able to specify a
-	// transaction with a negative value.
-	ErrNegativeValue = errors.New("negative value")
+	// transaction with a negative GetValue.
+	ErrNegativeValue = errors.New("negative GetValue")
 
-	// ErrOversizedData is returned if the input data of a transaction is greater
+	// ErrOversizedData is returned if the input Data of a transaction is greater
 	// than some meaningful limit a user might use. This is not a consensus error
 	// making the transaction invalid, rather a DOS protection.
-	ErrOversizedData = errors.New("oversized data")
+	ErrOversizedData = errors.New("oversized Data")
 )
 
 var (
@@ -113,7 +113,7 @@ const (
 	TxStatusIncluded
 )
 
-// blockChain provides the state of blockchain and current gas limit to do
+// blockChain provides the State of blockchain and current Gas limit to do
 // some pre checks in tx pool and event subscribers.
 type blockChain interface {
 	GetCurrentBlock() *types.Block
@@ -129,7 +129,7 @@ type TxPoolConfig struct {
 	Journal   string        // Journal of local transactions to survive node restarts
 	Rejournal time.Duration // Time interval to regenerate the local transaction Journal
 
-	PriceLimit uint64 // Minimum gas price to enforce for acceptance into the pool
+	PriceLimit uint64 // Minimum Gas price to enforce for acceptance into the pool
 	PriceBump  uint64 // Minimum price bump percentage to replace an already existing transaction (nonce)
 
 	AccountSlots uint64 // Minimum number of executable transaction slots guaranteed per account
@@ -181,7 +181,7 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 // locally. They exit the pool when they are included in the blockchain.
 //
 // The pool separates processable transactions (which can be applied to the
-// current state) and future transactions. Transactions move between those
+// current State) and future transactions. Transactions move between those
 // two states over time as they are received and Processed.
 type TxPool struct {
 	Config       TxPoolConfig
@@ -195,9 +195,9 @@ type TxPool struct {
 	Signer       types.Signer
 	Mu           sync.RWMutex
 
-	CurrentState  *state.StateDB      // Current state in the blockchain head
-	PendingState  *state.ManagedState // GetPending state tracking virtual nonces
-	CurrentMaxGas uint64              // Current gas limit for transaction caps
+	CurrentState  *state.StateDB      // Current State in the blockchain head
+	PendingState  *state.ManagedState // GetPending State tracking virtual nonces
+	CurrentMaxGas uint64              // Current Gas limit for transaction caps
 
 	Locals  *accountSet // Set of local transaction to exempt from eviction rules
 	Journal *txJournal  // Journal of local transaction to back up to disk
@@ -216,7 +216,7 @@ type TxPool struct {
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
 func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
-	// Sanitize the input to ensure no vulnerable gas prices are set
+	// Sanitize the input to ensure no vulnerable Gas prices are set
 	config = (&config).sanitize()
 
 	// Create the transaction pool with its initial settings
@@ -348,10 +348,10 @@ func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
 	pool.reset(oldHead, newHead)
 }
 
-// reset retrieves the current state of the blockchain and ensures the content
-// of the transaction pool is valid with regard to the Chain state.
+// reset retrieves the current State of the blockchain and ensures the content
+// of the transaction pool is valid with regard to the Chain State.
 func (pool *TxPool) reset(oldHead, newHead *types.Header) {
-	// If we're reorging an old state, reinject All dropped transactions
+	// If we're reorging an old State, reinject All dropped transactions
 	var reinject types.Transactions
 
 	if oldHead != nil && oldHead.Hash() != newHead.ParentHash {
@@ -398,13 +398,13 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 			reinject = types.TxDifference(discarded, included)
 		}
 	}
-	// Initialize the internal state to the current head
+	// Initialize the internal State to the current head
 	if newHead == nil {
 		newHead = pool.Chain.GetCurrentBlock().Header() // Special case during testing
 	}
 	statedb, err := pool.Chain.StateAt(newHead.Root)
 	if err != nil {
-		log.Error("Failed to reset txpool state", "err", err)
+		log.Error("Failed to reset txpool State", "err", err)
 		return
 	}
 	pool.CurrentState = statedb
@@ -418,7 +418,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	// validate the pool of Pending transactions, this will remove
 	// any transactions that have been included in the block or
 	// have been invalidated because of another transaction (e.g.
-	// higher gas price)
+	// higher Gas price)
 	pool.demoteUnexecutables()
 
 	// Update All accounts to the latest known Pending nonce
@@ -452,7 +452,7 @@ func (pool *TxPool) SubscribeTxPreEvent(ch chan<- TxPreEvent) event.Subscription
 	return pool.Scope.Track(pool.TxFeed.Subscribe(ch))
 }
 
-// GetGasPrice returns the current gas price enforced by the transaction pool.
+// GetGasPrice returns the current Gas price enforced by the transaction pool.
 func (pool *TxPool) GetGasPrice() *big.Int {
 	pool.Mu.RLock()
 	defer pool.Mu.RUnlock()
@@ -473,7 +473,7 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 	log.Info("Transaction pool price threshold updated", "price", price)
 }
 
-// State returns the virtual managed state of the transaction pool.
+// State returns the virtual managed State of the transaction pool.
 func (pool *TxPool) State() *state.ManagedState {
 	pool.Mu.RLock()
 	defer pool.Mu.RUnlock()
@@ -504,7 +504,7 @@ func (pool *TxPool) stats() (int, int) {
 	return pending, queued
 }
 
-// Content retrieves the data content of the transaction pool, returning All the
+// Content retrieves the Data content of the transaction pool, returning All the
 // Pending as well as Queued transactions, grouped by account and sorted by nonce.
 func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
 	pool.Mu.Lock()
@@ -563,7 +563,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if tx.Value().Sign() < 0 {
 		return ErrNegativeValue
 	}
-	// Ensure the transaction doesn't exceed the current block limit gas.
+	// Ensure the transaction doesn't exceed the current block limit Gas.
 	if pool.CurrentMaxGas < tx.Gas() {
 		return ErrGasLimit
 	}
@@ -572,7 +572,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if err != nil {
 		return ErrInvalidSender
 	}
-	// Drop non-local transactions under our own minimal accepted gas price
+	// Drop non-local transactions under our own minimal accepted Gas price
 	local = local || pool.Locals.Contains(from) // account may be local even if the transaction arrived from the network
 	if !local && pool.GasPrice.Cmp(tx.GasPrice()) > 0 {
 		return ErrUnderpriced
@@ -783,7 +783,7 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	pool.Mu.Lock()
 	defer pool.Mu.Unlock()
 
-	// Try to inject the transaction and update any state
+	// Try to inject the transaction and Update any State
 	replace, err := pool.add(tx, local)
 	if err != nil {
 		return err
@@ -820,7 +820,7 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 			}
 		}
 	}
-	// Only reprocess the internal state if something was actually added
+	// Only reprocess the internal State if something was actually added
 	if len(dirty) > 0 {
 		addrs := make([]common.Address, 0, len(dirty))
 		for addr := range dirty {
@@ -926,7 +926,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			delete(pool.All, hash)
 			pool.Priced.Removed()
 		}
-		// Drop All transactions that are too costly (low balance or out of gas)
+		// Drop All transactions that are too costly (low balance or out of Gas)
 		drops, _ := list.Filter(pool.CurrentState.GetBalance(addr), pool.CurrentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()
@@ -1084,7 +1084,7 @@ func (pool *TxPool) demoteUnexecutables() {
 			delete(pool.All, hash)
 			pool.Priced.Removed()
 		}
-		// Drop All transactions that are too costly (low balance or out of gas), and Queue any invalids back for later
+		// Drop All transactions that are too costly (low balance or out of Gas), and Queue any invalids back for later
 		drops, invalids := list.Filter(pool.CurrentState.GetBalance(addr), pool.CurrentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()

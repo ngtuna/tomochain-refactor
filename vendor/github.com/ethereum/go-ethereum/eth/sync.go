@@ -42,8 +42,8 @@ type Txsync struct {
 	Txs []*types.Transaction
 }
 
-// syncTransactions starts sending all currently pending transactions to the given Peer.
-func (pm *ProtocolManager) syncTransactions(p *Peer) {
+// SyncTransactions starts sending all currently pending transactions to the given Peer.
+func (pm *ProtocolManager) SyncTransactions(p *Peer) {
 	var txs types.Transactions
 	pending, _ := pm.Txpool.GetPending()
 	for _, batch := range pending {

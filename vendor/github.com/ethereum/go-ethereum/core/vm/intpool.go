@@ -22,46 +22,46 @@ var checkVal = big.NewInt(-42)
 
 const poolLimit = 256
 
-// intPool is a pool of big integers that
+// IntPool is a Pool of big integers that
 // can be reused for all big.Int operations.
-type intPool struct {
-	pool *Stack
+type IntPool struct {
+	Pool *Stack
 }
 
-func newIntPool() *intPool {
-	return &intPool{pool: newstack()}
+func NewIntPool() *IntPool {
+	return &IntPool{Pool: Newstack()}
 }
 
-// get retrieves a big int from the pool, allocating one if the pool is empty.
-// Note, the returned int's value is arbitrary and will not be zeroed!
-func (p *intPool) get() *big.Int {
-	if p.pool.len() > 0 {
-		return p.pool.pop()
+// Get retrieves a big int from the Pool, allocating one if the Pool is empty.
+// Note, the returned int's Value is arbitrary and will not be zeroed!
+func (p *IntPool) Get() *big.Int {
+	if p.Pool.Len() > 0 {
+		return p.Pool.Pop()
 	}
 	return new(big.Int)
 }
 
-// getZero retrieves a big int from the pool, setting it to zero or allocating
-// a new one if the pool is empty.
-func (p *intPool) getZero() *big.Int {
-	if p.pool.len() > 0 {
-		return p.pool.pop().SetUint64(0)
+// GetZero retrieves a big int from the Pool, setting it to zero or allocating
+// a new one if the Pool is empty.
+func (p *IntPool) GetZero() *big.Int {
+	if p.Pool.Len() > 0 {
+		return p.Pool.Pop().SetUint64(0)
 	}
 	return new(big.Int)
 }
 
-// put returns an allocated big int to the pool to be later reused by get calls.
-// Note, the values as saved as is; neither put nor get zeroes the ints out!
-func (p *intPool) put(is ...*big.Int) {
-	if len(p.pool.data) > poolLimit {
+// Put Returns an allocated big int to the Pool to be later reused by Get calls.
+// Note, the values as saved as is; neither Put nor Get zeroes the ints out!
+func (p *IntPool) Put(is ...*big.Int) {
+	if len(p.Pool.data) > poolLimit {
 		return
 	}
 	for _, i := range is {
-		// verifyPool is a build flag. Pool verification makes sure the integrity
-		// of the integer pool by comparing values to a default value.
-		if verifyPool {
+		// VerifyPool is a build flag. Pool verification makes sure the integrity
+		// of the integer Pool by comparing values to a default Value.
+		if VerifyPool {
 			i.Set(checkVal)
 		}
-		p.pool.push(i)
+		p.Pool.Push(i)
 	}
 }

@@ -65,9 +65,9 @@ type ChainIndexerChain interface {
 // after an entire section has been finished or in case of rollbacks that might
 // affect already finished sections.
 type ChainIndexer struct {
-	chainDb  ethdb.Database      // Chain database to index the data from
+	chainDb  ethdb.Database      // Chain database to index the Data from
 	indexDb  ethdb.Database      // Prefixed table-view of the Db to write index metadata into
-	backend  ChainIndexerBackend // Background Processor generating the index data content
+	backend  ChainIndexerBackend // Background Processor generating the index Data content
 	children []*ChainIndexer     // Child indexers to cascade Chain updates to
 
 	active uint32          // Flag whether the event loop was started
@@ -137,7 +137,7 @@ func (c *ChainIndexer) Start(chain ChainIndexerChain) {
 func (c *ChainIndexer) Close() error {
 	var errs []error
 
-	// Tear down the primary update loop
+	// Tear down the primary Update loop
 	errc := make(chan error)
 	c.quit <- errc
 	if err := <-errc; err != nil {
@@ -193,7 +193,7 @@ func (c *ChainIndexer) eventLoop(currentHeader *types.Header, events chan ChainE
 			return
 
 		case ev, ok := <-events:
-			// Received a new event, ensure it's not nil (closing) and update
+			// Received a new event, ensure it's not nil (closing) and Update
 			if !ok {
 				errc := <-c.quit
 				errc <- nil
@@ -244,7 +244,7 @@ func (c *ChainIndexer) newHead(head uint64, reorg bool) {
 		}
 		return
 	}
-	// No reorg, calculate the number of newly known sections and update if high enough
+	// No reorg, calculate the number of newly known sections and Update if high enough
 	var sections uint64
 	if head >= c.confirmsReq {
 		sections = (head + 1 - c.confirmsReq) / c.sectionSize
@@ -275,7 +275,7 @@ func (c *ChainIndexer) updateLoop() {
 			return
 
 		case <-c.update:
-			// Section headers completed (or rolled back), update the index
+			// Section headers completed (or rolled back), Update the index
 			c.lock.Lock()
 			if c.knownSections > c.storedSections {
 				// Periodically print an upgrade log message to the user
@@ -311,7 +311,7 @@ func (c *ChainIndexer) updateLoop() {
 
 					c.cascadedHead = c.storedSections*c.sectionSize - 1
 					for _, child := range c.children {
-						c.log.Trace("Cascading Chain index update", "head", c.cascadedHead)
+						c.log.Trace("Cascading Chain index Update", "head", c.cascadedHead)
 						child.newHead(c.cascadedHead, false)
 					}
 				} else {
@@ -393,7 +393,7 @@ func (c *ChainIndexer) AddChildIndexer(indexer *ChainIndexer) {
 }
 
 // loadValidSections reads the number of valid sections from the index database
-// and caches is into the local state.
+// and caches is into the local State.
 func (c *ChainIndexer) loadValidSections() {
 	data, _ := c.indexDb.Get([]byte("count"))
 	if len(data) == 8 {

@@ -92,7 +92,7 @@ func (c *ecrecover) Run(input []byte) ([]byte, error) {
 	}
 	// v needs to be at the end for libsecp256k1
 	pubKey, err := crypto.Ecrecover(input[:32], append(input[64:128], v))
-	// make sure the public key is a valid one
+	// make sure the public key is a Valid one
 	if err != nil {
 		return nil, nil
 	}
@@ -104,9 +104,9 @@ func (c *ecrecover) Run(input []byte) ([]byte, error) {
 // SHA256 implemented as a native contract.
 type sha256hash struct{}
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
+// RequiredGas Returns the gas required to Execute the pre-compiled contract.
 //
-// This method does not require any overflow checking as the input size gas costs
+// This method does not Require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
 func (c *sha256hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
@@ -119,9 +119,9 @@ func (c *sha256hash) Run(input []byte) ([]byte, error) {
 // RIPMED160 implemented as a native contract.
 type ripemd160hash struct{}
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
+// RequiredGas Returns the gas required to Execute the pre-compiled contract.
 //
-// This method does not require any overflow checking as the input size gas costs
+// This method does not Require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
 func (c *ripemd160hash) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Ripemd160PerWordGas + params.Ripemd160BaseGas
@@ -135,9 +135,9 @@ func (c *ripemd160hash) Run(input []byte) ([]byte, error) {
 // data copy implemented as a native contract.
 type dataCopy struct{}
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
+// RequiredGas Returns the gas required to Execute the pre-compiled contract.
 //
-// This method does not require any overflow checking as the input size gas costs
+// This method does not Require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
 func (c *dataCopy) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
@@ -146,7 +146,7 @@ func (c *dataCopy) Run(in []byte) ([]byte, error) {
 	return in, nil
 }
 
-// bigModExp implements a native big integer exponential modular operation.
+// bigModExp implements a native big integer exponential modular Operation.
 type bigModExp struct{}
 
 var (
@@ -154,7 +154,7 @@ var (
 	big4      = big.NewInt(4)
 	big8      = big.NewInt(8)
 	big16     = big.NewInt(16)
-	big32     = big.NewInt(32)
+	Big32     = big.NewInt(32)
 	big64     = big.NewInt(64)
 	big96     = big.NewInt(96)
 	big480    = big.NewInt(480)
@@ -163,7 +163,7 @@ var (
 	big199680 = big.NewInt(199680)
 )
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
+// RequiredGas Returns the gas required to Execute the pre-compiled contract.
 func (c *bigModExp) RequiredGas(input []byte) uint64 {
 	var (
 		baseLen = new(big.Int).SetBytes(getData(input, 0, 32))
@@ -180,7 +180,7 @@ func (c *bigModExp) RequiredGas(input []byte) uint64 {
 	if big.NewInt(int64(len(input))).Cmp(baseLen) <= 0 {
 		expHead = new(big.Int)
 	} else {
-		if expLen.Cmp(big32) > 0 {
+		if expLen.Cmp(Big32) > 0 {
 			expHead = new(big.Int).SetBytes(getData(input, baseLen.Uint64(), 32))
 		} else {
 			expHead = new(big.Int).SetBytes(getData(input, baseLen.Uint64(), expLen.Uint64()))
@@ -192,13 +192,13 @@ func (c *bigModExp) RequiredGas(input []byte) uint64 {
 		msb = bitlen - 1
 	}
 	adjExpLen := new(big.Int)
-	if expLen.Cmp(big32) > 0 {
-		adjExpLen.Sub(expLen, big32)
+	if expLen.Cmp(Big32) > 0 {
+		adjExpLen.Sub(expLen, Big32)
 		adjExpLen.Mul(big8, adjExpLen)
 	}
 	adjExpLen.Add(adjExpLen, big.NewInt(int64(msb)))
 
-	// Calculate the gas cost of the operation
+	// Calculate the gas cost of the Operation
 	gas := new(big.Int).Set(math.BigMax(modLen, baseLen))
 	switch {
 	case gas.Cmp(big64) <= 0:
@@ -238,7 +238,7 @@ func (c *bigModExp) Run(input []byte) ([]byte, error) {
 	if baseLen == 0 && modLen == 0 {
 		return []byte{}, nil
 	}
-	// Retrieve the operands and execute the exponentiation
+	// Retrieve the operands and Execute the exponentiation
 	var (
 		base = new(big.Int).SetBytes(getData(input, 0, baseLen))
 		exp  = new(big.Int).SetBytes(getData(input, baseLen, expLen))
@@ -274,7 +274,7 @@ func newTwistPoint(blob []byte) (*bn256.G2, error) {
 // bn256Add implements a native elliptic curve point addition.
 type bn256Add struct{}
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
+// RequiredGas Returns the gas required to Execute the pre-compiled contract.
 func (c *bn256Add) RequiredGas(input []byte) uint64 {
 	return params.Bn256AddGas
 }
@@ -296,7 +296,7 @@ func (c *bn256Add) Run(input []byte) ([]byte, error) {
 // bn256ScalarMul implements a native elliptic curve scalar multiplication.
 type bn256ScalarMul struct{}
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
+// RequiredGas Returns the gas required to Execute the pre-compiled contract.
 func (c *bn256ScalarMul) RequiredGas(input []byte) uint64 {
 	return params.Bn256ScalarMulGas
 }
@@ -325,7 +325,7 @@ var (
 // bn256Pairing implements a pairing pre-compile for the bn256 curve
 type bn256Pairing struct{}
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
+// RequiredGas Returns the gas required to Execute the pre-compiled contract.
 func (c *bn256Pairing) RequiredGas(input []byte) uint64 {
 	return params.Bn256PairingBaseGas + uint64(len(input)/192)*params.Bn256PairingPerPointGas
 }

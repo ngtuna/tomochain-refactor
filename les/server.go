@@ -31,7 +31,7 @@ import (
 
 func NewLesServer(eth *tomoETh.TomoChain, config *eth.Config) (*les.LesServer, error) {
 	quitSync := make(chan struct{})
-	pm, err := les.NewProtocolManager(eth.BlockChain().Config(), false, les.ServerProtocolVersions, config.NetworkId, eth.GetEventMux(), eth.GetEngine(), les.NewPeerSet(), eth.BlockChain(), eth.GetTxPool(), eth.GetChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
+	pm, err := les.NewProtocolManager(eth.BlockChain().Config(), false, les.ServerProtocolVersions, config.NetworkId, eth.GetEventMux(), les.NewPeerSet(), eth.BlockChain(), eth.GetTxPool(), eth.GetChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
 	if err != nil {
 		return nil, err
 	}

@@ -23,16 +23,15 @@ import (
 
 	"github.com/tomochain/tomochain/consensus"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/miner"
 )
 
 type CpuAgent struct {
 	mu sync.Mutex
 
-	workCh        chan *miner.Work
+	workCh        chan *Work
 	stop          chan struct{}
 	quitCurrentOp chan struct{}
-	returnCh      chan<- *miner.Result
+	returnCh      chan<- *Result
 
 	chain  consensus.ChainReader
 	engine consensus.Engine
@@ -45,13 +44,13 @@ func NewCpuAgent(chain consensus.ChainReader, engine consensus.Engine) *CpuAgent
 		chain:  chain,
 		engine: engine,
 		stop:   make(chan struct{}, 1),
-		workCh: make(chan *miner.Work, 1),
+		workCh: make(chan *Work, 1),
 	}
 	return miner
 }
 
-func (self *CpuAgent) Work() chan<- *miner.Work            { return self.workCh }
-func (self *CpuAgent) SetReturnCh(ch chan<- *miner.Result) { self.returnCh = ch }
+func (self *CpuAgent) Work() chan<- *Work            { return self.workCh }
+func (self *CpuAgent) SetReturnCh(ch chan<- *Result) { self.returnCh = ch }
 
 func (self *CpuAgent) Stop() {
 	if !atomic.CompareAndSwapInt32(&self.isMining, 1, 0) {
@@ -100,10 +99,10 @@ out:
 	}
 }
 
-func (self *CpuAgent) mine(work *miner.Work, stop <-chan struct{}) {
+func (self *CpuAgent) mine(work *Work, stop <-chan struct{}) {
 	if result, err := self.engine.Seal(self.chain, work.Block, stop); result != nil {
 		log.Info("Successfully sealed new block", "number", result.Number(), "hash", result.Hash())
-		self.returnCh <- &miner.Result{work, result}
+		self.returnCh <- &Result{work, result}
 	} else {
 		if err != nil {
 			log.Warn("Block sealing failed", "err", err)

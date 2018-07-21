@@ -26,7 +26,7 @@ import (
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
-// Processed state.
+// Processed State.
 //
 // BlockValidator implements GetValidator.
 type BlockValidator struct {
@@ -73,14 +73,14 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	return nil
 }
 
-// ValidateState validates the various changes that happen after a state
-// transition, such as amount of used gas, the receipt roots and the state root
+// ValidateState validates the various changes that happen after a State
+// transition, such as amount of used Gas, the receipt roots and the State root
 // itself. ValidateState returns a database batch if the validation was a success
 // otherwise nil and an error is returned.
 func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.StateDB, receipts types.Receipts, usedGas uint64) error {
 	header := block.Header()
 	if block.GasUsed() != usedGas {
-		return fmt.Errorf("invalid gas used (remote: %d local: %d)", block.GasUsed(), usedGas)
+		return fmt.Errorf("invalid Gas used (remote: %d local: %d)", block.GasUsed(), usedGas)
 	}
 	// Validate the received block's bloom with the one derived from the generated receipts.
 	// For valid blocks this should always validate to true.
@@ -93,7 +93,7 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	if receiptSha != header.ReceiptHash {
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash, receiptSha)
 	}
-	// Validate the state root against the received state root and throw
+	// Validate the State root against the received State root and throw
 	// an error if they don't match.
 	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {
 		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root, root)
@@ -101,7 +101,7 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	return nil
 }
 
-// CalcGasLimit computes the gas limit of the next block after parent.
+// CalcGasLimit computes the Gas limit of the next block after parent.
 // This is miner strategy, not consensus protocol.
 func CalcGasLimit(parent *types.Block) uint64 {
 	// contrib = (parentGasUsed * 3 / 2) / 1024
@@ -112,7 +112,7 @@ func CalcGasLimit(parent *types.Block) uint64 {
 
 	/*
 		strategy: gasLimit of block-to-mine is set based on parent's
-		gasUsed value.  if parentGasUsed > parentGasLimit * (2/3) then we
+		gasUsed GetValue.  if parentGasUsed > parentGasLimit * (2/3) then we
 		increase it, otherwise lower it (or leave it unchanged if it's right
 		at that usage) the amount increased/decreased depends on how far away
 		from parentGasLimit * (2/3) parentGasUsed is.

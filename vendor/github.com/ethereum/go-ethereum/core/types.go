@@ -31,15 +31,15 @@ type Validator interface {
 	ValidateBody(block *types.Block) error
 
 	// ValidateState validates the given statedb and optionally the receipts and
-	// gas used.
+	// Gas used.
 	ValidateState(block, parent *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error
 }
 
-// GetProcessor is an interface for processing blocks using a given initial state.
+// GetProcessor is an interface for processing blocks using a given initial State.
 //
 // Process takes the block to be Processed and the statedb upon which the
-// initial state is based. It should return the receipts generated, amount
-// of gas used in the process and return an error if any of the internal rules
+// initial State is based. It should return the receipts generated, amount
+// of Gas used in the process and return an error if any of the internal rules
 // failed.
 type Processor interface {
 	Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error)

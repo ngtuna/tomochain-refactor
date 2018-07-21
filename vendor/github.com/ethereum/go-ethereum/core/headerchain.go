@@ -36,9 +36,9 @@ import (
 )
 
 const (
-	headerCacheLimit = 512
-	tdCacheLimit     = 1024
-	numberCacheLimit = 2048
+	HeaderCacheLimit = 512
+	TdCacheLimit     = 1024
+	NumberCacheLimit = 2048
 )
 
 // HeaderChain implements the basic block header Chain logic that is shared by
@@ -70,9 +70,9 @@ type HeaderChain struct {
 //  ProcInterrupt points to the parent's interrupt semaphore
 //  Wg points to the parent's shutdown wait group
 func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
-	headerCache, _ := lru.New(headerCacheLimit)
-	tdCache, _ := lru.New(tdCacheLimit)
-	numberCache, _ := lru.New(numberCacheLimit)
+	headerCache, _ := lru.New(HeaderCacheLimit)
+	tdCache, _ := lru.New(TdCacheLimit)
+	numberCache, _ := lru.New(NumberCacheLimit)
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -114,7 +114,7 @@ func (hc *HeaderChain) GetBlockNumber(hash common.Hash) uint64 {
 		return cached.(uint64)
 	}
 	number := GetBlockNumber(hc.chainDb, hash)
-	if number != missingNumber {
+	if number != MissingNumber {
 		hc.numberCache.Add(hash, number)
 	}
 	return number
@@ -368,7 +368,7 @@ func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
 	if hc.numberCache.Contains(hash) || hc.headerCache.Contains(hash) {
 		return true
 	}
-	ok, _ := hc.chainDb.Has(headerKey(hash, number))
+	ok, _ := hc.chainDb.Has(HeaderKey(hash, number))
 	return ok
 }
 

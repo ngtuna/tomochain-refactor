@@ -17,25 +17,26 @@
 package eth
 
 import (
-	"compress/gzip"
-	"context"
-	"fmt"
-	"io"
-	"math/big"
-	"os"
-	"strings"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
+	"fmt"
+	"math/big"
+	"os"
+	"io"
+	"strings"
+	"compress/gzip"
+	"github.com/ethereum/go-ethereum/eth"
 	"github.com/tomochain/tomochain/miner"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/params"
+	"context"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/trie"
+	tomoCore "github.com/tomochain/tomochain/core"
 )
 
 // PublicTomoChainAPI provides an API to access Ethereum full node-related
@@ -232,7 +233,7 @@ func (api *PrivateAdminAPI) ExportChain(file string) (bool, error) {
 	return true, nil
 }
 
-func hasAllBlocks(chain *core.BlockChain, bs []*types.Block) bool {
+func HasAllBlocks(chain *tomoCore.TomoBlockChain, bs []*types.Block) bool {
 	for _, b := range bs {
 		if !chain.HasBlock(b.Hash(), b.NumberU64()) {
 			return false
@@ -278,7 +279,7 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 			break
 		}
 
-		if hasAllBlocks(api.eth.BlockChain(), blocks) {
+		if HasAllBlocks(api.eth.BlockChain(), blocks) {
 			blocks = blocks[:0]
 			continue
 		}
@@ -328,15 +329,15 @@ func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error
 	return stateDb.RawDump(), nil
 }
 
-// PrivateDebugAPI is the collection of Ethereum full node APIs exposed over
-// the private debugging endpoint.
+//PrivateDebugAPI is the collection of Ethereum full node APIs exposed over
+//the private debugging endpoint.
 type PrivateDebugAPI struct {
 	config *params.ChainConfig
 	eth    *TomoChain
 }
 
-// NewPrivateDebugAPI creates a new API definition for the full node-related
-// private debug methods of the Ethereum service.
+//NewPrivateDebugAPI creates a new API definition for the full node-related
+//private debug methods of the Ethereum service.
 func NewPrivateDebugAPI(config *params.ChainConfig, eth *TomoChain) *PrivateDebugAPI {
 	return &PrivateDebugAPI{config: config, eth: eth}
 }
@@ -353,41 +354,28 @@ func (api *PrivateDebugAPI) GetBadBlocks(ctx context.Context) ([]core.BadBlockAr
 	return api.eth.BlockChain().GetBadBlocks()
 }
 
-// StorageRangeResult is the result of a debug_storageRangeAt API call.
-type StorageRangeResult struct {
-	Storage storageMap   `json:"storage"`
-	NextKey *common.Hash `json:"nextKey"` // nil if Storage includes the last key in the trie.
-}
-
-type storageMap map[common.Hash]storageEntry
-
-type storageEntry struct {
-	Key   *common.Hash `json:"key"`
-	Value common.Hash  `json:"value"`
-}
-
 // StorageRangeAt returns the storage at the given block height and transaction index.
-func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
+func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (eth.StorageRangeResult, error) {
 	_, _, statedb, err := api.computeTxEnv(blockHash, txIndex, 0)
 	if err != nil {
-		return StorageRangeResult{}, err
+		return eth.StorageRangeResult{}, err
 	}
 	st := statedb.StorageTrie(contractAddress)
 	if st == nil {
-		return StorageRangeResult{}, fmt.Errorf("account %x doesn't exist", contractAddress)
+		return eth.StorageRangeResult{}, fmt.Errorf("account %x doesn't exist", contractAddress)
 	}
 	return storageRangeAt(st, keyStart, maxResult)
 }
 
-func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeResult, error) {
+func storageRangeAt(st state.Trie, start []byte, maxResult int) (eth.StorageRangeResult, error) {
 	it := trie.NewIterator(st.NodeIterator(start))
-	result := StorageRangeResult{Storage: storageMap{}}
+	result := eth.StorageRangeResult{Storage: eth.StorageMap{}}
 	for i := 0; i < maxResult && it.Next(); i++ {
 		_, content, _, err := rlp.Split(it.Value)
 		if err != nil {
-			return StorageRangeResult{}, err
+			return eth.StorageRangeResult{}, err
 		}
-		e := storageEntry{Value: common.BytesToHash(content)}
+		e := eth.StorageEntry{Value: common.BytesToHash(content)}
 		if preimage := st.GetKey(it.Key); preimage != nil {
 			preimage := common.BytesToHash(preimage)
 			e.Key = &preimage

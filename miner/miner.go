@@ -29,10 +29,21 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/miner"
-
 	"github.com/tomochain/tomochain/consensus"
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/ethdb"
+
+	tomoCore "github.com/tomochain/tomochain/core"
 )
+
+type Backend interface {
+	GetAccountManager() *accounts.Manager
+	BlockChain() *tomoCore.TomoBlockChain
+	GetTxPool() *core.TxPool
+	GetChainDb() ethdb.Database
+}
+
 
 // GetMiner creates blocks and searches for proof-of-work values.
 type Miner struct {
@@ -42,14 +53,14 @@ type Miner struct {
 
 	coinbase common.Address
 	mining   int32
-	eth      miner.Backend
+	eth      Backend
 	engine   consensus.Engine
 
 	canStart    int32 // can start indicates whether we can start the Mining operation
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(eth miner.Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
+func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
 	miner := &Miner{
 		eth:      eth,
 		mux:      mux,
@@ -116,14 +127,14 @@ func (self *Miner) Stop() {
 	atomic.StoreInt32(&self.shouldStart, 0)
 }
 
-func (self *Miner) Register(agent miner.Agent) {
+func (self *Miner) Register(agent Agent) {
 	if self.Mining() {
 		agent.Start()
 	}
 	self.worker.register(agent)
 }
 
-func (self *Miner) Unregister(agent miner.Agent) {
+func (self *Miner) Unregister(agent Agent) {
 	self.worker.unregister(agent)
 }
 
@@ -139,7 +150,7 @@ func (self *Miner) HashRate() (tot int64) {
 	// aspects of the Worker/locking up Agents so we can get an accurate
 	// hashrate?
 	for agent := range self.worker.Agents {
-		if _, ok := agent.(*miner.CpuAgent); !ok {
+		if _, ok := agent.(*CpuAgent); !ok {
 			tot += agent.GetHashRate()
 		}
 	}

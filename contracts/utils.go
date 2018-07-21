@@ -57,8 +57,8 @@ func CreateTransactionSign(chainConfig *params.ChainConfig, pool *core.TxPool, m
 
 // Create tx sign.
 func CreateTxSign(blockNumber *big.Int, nonce uint64, blockSigner ethCommon.Address) *types.Transaction {
-	blockHex := common.LeftPadBytes(blockNumber.Bytes(), 32)
-	data := common.Hex2Bytes(HexSignMethod)
+	blockHex := ethCommon.LeftPadBytes(blockNumber.Bytes(), 32)
+	data := ethCommon.Hex2Bytes(HexSignMethod)
 	inputData := append(data, blockHex...)
 	tx := types.NewTransaction(nonce, blockSigner, big.NewInt(0), 100000, big.NewInt(0), inputData)
 

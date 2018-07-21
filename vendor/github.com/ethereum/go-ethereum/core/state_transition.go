@@ -28,36 +28,36 @@ import (
 )
 
 var (
-	errInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
+	ErrInsufficientBalanceForGas = errors.New("insufficient balance to pay for Gas")
 )
 
 /*
 The State Transitioning Model
 
-A state transition is a change made when a transaction is applied to the current world state
-The state transitioning model does All All the necessary work to work out a valid new state root.
+A State transition is a change made when a transaction is applied to the current world State
+The State transitioning model does All All the necessary work to work out a valid new State root.
 
 1) Nonce handling
-2) Pre pay gas
-3) Create a new state object if the recipient is \0*32
-4) Value transfer
+2) Pre pay Gas
+3) Create a new State object if the recipient is \0*32
+4) GetValue transfer
 == If contract creation ==
-  4a) Attempt to run transaction data
-  4b) If valid, use result as code for the new state object
+  4a) Attempt to run transaction Data
+  4b) If valid, use result as code for the new State object
 == end ==
 5) Run Script section
-6) Derive new state root
+6) Derive new State root
 */
 type StateTransition struct {
-	gp         *GasPool
-	msg        Message
-	gas        uint64
-	gasPrice   *big.Int
-	initialGas uint64
-	value      *big.Int
-	data       []byte
-	state      vm.StateDB
-	evm        *vm.EVM
+	Gp         *GasPool
+	Msg        Message
+	Gas        uint64
+	GasPrice   *big.Int
+	InitialGas uint64
+	Value      *big.Int
+	Data       []byte
+	State      vm.StateDB
+	Evm        *vm.EVM
 }
 
 // Message represents a message sent to a contract.
@@ -75,16 +75,16 @@ type Message interface {
 	Data() []byte
 }
 
-// IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
+// IntrinsicGas computes the 'intrinsic Gas' for a message with the given Data.
 func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error) {
-	// Set the starting gas for the raw transaction
+	// Set the starting Gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
 		gas = params.TxGasContractCreation
 	} else {
 		gas = params.TxGas
 	}
-	// Bump the required gas by the amount of transactional data
+	// Bump the required Gas by the amount of transactional Data
 	if len(data) > 0 {
 		// Zero and non-zero bytes are Priced differently
 		var nz uint64
@@ -93,7 +93,7 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 				nz++
 			}
 		}
-		// Make sure we don't exceed uint64 for All data combinations
+		// Make sure we don't exceed uint64 for All Data combinations
 		if (math.MaxUint64-gas)/params.TxDataNonZeroGas < nz {
 			return 0, vm.ErrOutOfGas
 		}
@@ -108,89 +108,89 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 	return gas, nil
 }
 
-// NewStateTransition initialises and returns a new state transition object.
+// NewStateTransition initialises and returns a new State transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
 	return &StateTransition{
-		gp:       gp,
-		evm:      evm,
-		msg:      msg,
-		gasPrice: msg.GasPrice(),
-		value:    msg.Value(),
-		data:     msg.Data(),
-		state:    evm.StateDB,
+		Gp:       gp,
+		Evm:      evm,
+		Msg:      msg,
+		GasPrice: msg.GasPrice(),
+		Value:    msg.Value(),
+		Data:     msg.Data(),
+		State:    evm.StateDB,
 	}
 }
 
-// ApplyMessage computes the new state by applying the given message
-// against the old state within the environment.
+// ApplyMessage computes the new State by applying the given message
+// against the old State within the environment.
 //
 // ApplyMessage returns the bytes returned by any EVM execution (if it took place),
-// the gas used (which includes gas refunds) and an error if it failed. An error always
+// the Gas used (which includes Gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
-// state and would never be accepted within a block.
+// State and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, error) {
 	return NewStateTransition(evm, msg, gp).TransitionDb()
 }
 
 func (st *StateTransition) from() vm.AccountRef {
-	f := st.msg.From()
-	if !st.state.Exist(f) {
-		st.state.CreateAccount(f)
+	f := st.Msg.From()
+	if !st.State.Exist(f) {
+		st.State.CreateAccount(f)
 	}
 	return vm.AccountRef(f)
 }
 
 func (st *StateTransition) to() vm.AccountRef {
-	if st.msg == nil {
+	if st.Msg == nil {
 		return vm.AccountRef{}
 	}
-	to := st.msg.To()
+	to := st.Msg.To()
 	if to == nil {
 		return vm.AccountRef{} // contract creation
 	}
 
 	reference := vm.AccountRef(*to)
-	if !st.state.Exist(*to) {
-		st.state.CreateAccount(*to)
+	if !st.State.Exist(*to) {
+		st.State.CreateAccount(*to)
 	}
 	return reference
 }
 
 func (st *StateTransition) useGas(amount uint64) error {
-	if st.gas < amount {
+	if st.Gas < amount {
 		return vm.ErrOutOfGas
 	}
-	st.gas -= amount
+	st.Gas -= amount
 
 	return nil
 }
 
 func (st *StateTransition) buyGas() error {
 	var (
-		state  = st.state
+		state  = st.State
 		sender = st.from()
 	)
-	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
+	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.Msg.Gas()), st.GasPrice)
 	if state.GetBalance(sender.Address()).Cmp(mgval) < 0 {
-		return errInsufficientBalanceForGas
+		return ErrInsufficientBalanceForGas
 	}
-	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
+	if err := st.Gp.SubGas(st.Msg.Gas()); err != nil {
 		return err
 	}
-	st.gas += st.msg.Gas()
+	st.Gas += st.Msg.Gas()
 
-	st.initialGas = st.msg.Gas()
+	st.InitialGas = st.Msg.Gas()
 	state.SubBalance(sender.Address(), mgval)
 	return nil
 }
 
 func (st *StateTransition) preCheck() error {
-	msg := st.msg
+	msg := st.Msg
 	sender := st.from()
 
 	// Make sure this transaction's nonce is correct
 	if msg.CheckNonce() {
-		nonce := st.state.GetNonce(sender.Address())
+		nonce := st.State.GetNonce(sender.Address())
 		if nonce < msg.Nonce() {
 			return ErrNonceTooHigh
 		} else if nonce > msg.Nonce() {
@@ -200,21 +200,21 @@ func (st *StateTransition) preCheck() error {
 	return st.buyGas()
 }
 
-// TransitionDb will transition the state by applying the current message and
-// returning the result including the the used gas. It returns an error if it
+// TransitionDb will transition the State by applying the current message and
+// returning the result including the the used Gas. It returns an error if it
 // failed. An error indicates a consensus issue.
 func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bool, err error) {
 	if err = st.preCheck(); err != nil {
 		return
 	}
-	msg := st.msg
+	msg := st.Msg
 	sender := st.from() // err checked in preCheck
 
-	homestead := st.evm.ChainConfig().IsHomestead(st.evm.BlockNumber)
+	homestead := st.Evm.ChainConfig().IsHomestead(st.Evm.BlockNumber)
 	contractCreation := msg.To() == nil
 
-	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation, homestead)
+	// Pay intrinsic Gas
+	gas, err := IntrinsicGas(st.Data, contractCreation, homestead)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -223,18 +223,18 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	}
 
 	var (
-		evm = st.evm
+		evm = st.Evm
 		// vm errors do not effect consensus and are therefor
 		// not assigned to err, except for insufficient balance
 		// error.
 		vmerr error
 	)
 	if contractCreation {
-		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
+		ret, _, st.Gas, vmerr = evm.Create(sender, st.Data, st.Gas, st.Value)
 	} else {
 		// Increment the nonce for the next transaction
-		st.state.SetNonce(sender.Address(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = evm.Call(sender, st.to().Address(), st.data, st.gas, st.value)
+		st.State.SetNonce(sender.Address(), st.State.GetNonce(sender.Address())+1)
+		ret, st.Gas, vmerr = evm.Call(sender, st.to().Address(), st.Data, st.Gas, st.Value)
 	}
 	if vmerr != nil {
 		log.Debug("VM returned with error", "err", vmerr)
@@ -246,31 +246,31 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		}
 	}
 	st.refundGas()
-	st.state.AddBalance(st.evm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
+	st.State.AddBalance(st.Evm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.GasPrice))
 
 	return ret, st.gasUsed(), vmerr != nil, err
 }
 
 func (st *StateTransition) refundGas() {
-	// Apply refund counter, capped to half of the used gas.
+	// Apply refund counter, capped to half of the used Gas.
 	refund := st.gasUsed() / 2
-	if refund > st.state.GetRefund() {
-		refund = st.state.GetRefund()
+	if refund > st.State.GetRefund() {
+		refund = st.State.GetRefund()
 	}
-	st.gas += refund
+	st.Gas += refund
 
-	// Return ETH for remaining gas, exchanged at the original rate.
+	// Return ETH for remaining Gas, exchanged at the original rate.
 	sender := st.from()
 
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
-	st.state.AddBalance(sender.Address(), remaining)
+	remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.Gas), st.GasPrice)
+	st.State.AddBalance(sender.Address(), remaining)
 
-	// Also return remaining gas to the block gas counter so it is
+	// Also return remaining Gas to the block Gas counter so it is
 	// available for the next transaction.
-	st.gp.AddGas(st.gas)
+	st.Gp.AddGas(st.Gas)
 }
 
-// gasUsed returns the amount of gas used up by the state transition.
+// gasUsed returns the amount of Gas used up by the State transition.
 func (st *StateTransition) gasUsed() uint64 {
-	return st.initialGas - st.gas
+	return st.InitialGas - st.Gas
 }

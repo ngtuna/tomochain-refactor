@@ -31,7 +31,7 @@ type ltrInfo struct {
 type LesTxRelay struct {
 	txSent       map[common.Hash]*ltrInfo
 	txPending    map[common.Hash]struct{}
-	ps           *peerSet
+	ps           *PeerSet
 	peerList     []*peer
 	peerStartPos int
 	lock         sync.RWMutex
@@ -39,7 +39,7 @@ type LesTxRelay struct {
 	reqDist *requestDistributor
 }
 
-func NewLesTxRelay(ps *peerSet, reqDist *requestDistributor) *LesTxRelay {
+func NewLesTxRelay(ps *PeerSet, reqDist *requestDistributor) *LesTxRelay {
 	r := &LesTxRelay{
 		txSent:    make(map[common.Hash]*ltrInfo),
 		txPending: make(map[common.Hash]struct{}),

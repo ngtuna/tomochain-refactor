@@ -41,17 +41,49 @@ import (
 	"github.com/ethereum/go-ethereum/eth"
 
 	"github.com/tomochain/tomochain/consensus"
+	tomoCore "github.com/tomochain/tomochain/core"
+	"sync"
 )
 
 type TomoProtocolManager struct {
+	NetworkId uint64
+
+	FastSync  uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
+	AcceptTxs uint32 // Flag whether we're considered synchronised (enables transaction processing)
+
+	Txpool      eth.TxPool
+	Blockchain  *tomoCore.TomoBlockChain
+	Chainconfig *params.ChainConfig
+	MaxPeers    int
+
+	Downloader *downloader.Downloader
+	Fetcher    *fetcher.Fetcher
+	Peers      *eth.PeerSet
+
+	SubProtocols []p2p.Protocol
+
+	EventMux      *event.TypeMux
+	TxCh          chan core.TxPreEvent
+	TxSub         event.Subscription
+	MinedBlockSub *event.TypeMuxSubscription
+
+	// channels for Fetcher, syncer, txsyncLoop
+	NewPeerCh   chan *eth.Peer
+	TxsyncCh    chan *eth.Txsync
+	QuitSync    chan struct{}
+	NoMorePeers chan struct{}
+
+	// wait group is used for graceful shutdowns during downloading
+	// and processing
+	Wg sync.WaitGroup
 	eth.ProtocolManager
 }
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The TomoChain sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *event.TypeMux, txpool *core.TxPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (*TomoProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *event.TypeMux, txpool *core.TxPool, engine consensus.Engine, blockchain *tomoCore.TomoBlockChain, chaindb ethdb.Database) (*TomoProtocolManager, error) {
 	// Create the protocol manager with the base fields
-	manager := &TomoProtocolManager{eth.ProtocolManager{
+	manager := &TomoProtocolManager{
 		NetworkId:   networkId,
 		EventMux:    mux,
 		Txpool:      txpool,
@@ -62,7 +94,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		NoMorePeers: make(chan struct{}),
 		TxsyncCh:    make(chan *eth.Txsync),
 		QuitSync:    make(chan struct{}),
-	},}
+	}
 	// Figure out whether to allow fast sync or not
 	if mode == downloader.FastSync && blockchain.GetCurrentBlock().NumberU64() > 0 {
 		log.Warn("Blockchain not empty, fast sync disabled")
@@ -542,3 +574,178 @@ func (pm *TomoProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transacti
 	}
 	log.Trace("Broadcast transaction", "hash", hash, "recipients", len(peers))
 }
+
+
+
+func (pm *TomoProtocolManager) RemovePeer(id string) {
+	// Short circuit if the Peer was already removed
+	peer := pm.Peers.Peer(id)
+	if peer == nil {
+		return
+	}
+	log.Debug("Removing Ethereum Peer", "Peer", id)
+
+	// Unregister the Peer from the Downloader and Ethereum Peer set
+	pm.Downloader.UnregisterPeer(id)
+	if err := pm.Peers.Unregister(id); err != nil {
+		log.Error("Peer removal failed", "Peer", id, "err", err)
+	}
+	// Hard disconnect at the networking layer
+	if peer != nil {
+		peer.Peer.Disconnect(p2p.DiscUselessPeer)
+	}
+}
+
+func (pm *TomoProtocolManager) Start(maxPeers int) {
+	pm.MaxPeers = maxPeers
+
+	// broadcast transactions
+	pm.TxCh = make(chan core.TxPreEvent, eth.TxChanSize)
+	pm.TxSub = pm.Txpool.SubscribeTxPreEvent(pm.TxCh)
+	go pm.txBroadcastLoop()
+
+	// broadcast mined blocks
+	pm.MinedBlockSub = pm.EventMux.Subscribe(core.NewMinedBlockEvent{})
+	go pm.minedBroadcastLoop()
+
+	// start sync handlers
+	go pm.syncer()
+	go pm.txsyncLoop()
+}
+
+func (pm *TomoProtocolManager) Stop() {
+	log.Info("Stopping Ethereum protocol")
+
+	pm.TxSub.Unsubscribe()         // quits txBroadcastLoop
+	pm.MinedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+
+	// Quit the sync loop.
+	// After this send has completed, no new Peers will be accepted.
+	pm.NoMorePeers <- struct{}{}
+
+	// Quit Fetcher, txsyncLoop.
+	close(pm.QuitSync)
+
+	// Disconnect existing sessions.
+	// This also closes the gate for any new registrations on the Peer set.
+	// sessions which are already established but not added to pm.Peers yet
+	// will exit when they try to register.
+	pm.Peers.Close()
+
+	// Wait for all Peer handler goroutines and the loops to come down.
+	pm.Wg.Wait()
+
+	log.Info("Ethereum protocol stopped")
+}
+
+func (pm *TomoProtocolManager) NewPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *eth.Peer {
+	return eth.NewPeer(pv, p, eth.NewMeteredMsgWriter(rw))
+}
+
+// Handle is the callback invoked to manage the life cycle of an eth Peer. When
+// this function terminates, the Peer is disconnected.
+func (pm *TomoProtocolManager) Handle(p *eth.Peer) error {
+	// Ignore MaxPeers if this is a trusted Peer
+	if pm.Peers.Len() >= pm.MaxPeers && !p.Peer.Info().Network.Trusted {
+		return p2p.DiscTooManyPeers
+	}
+	p.Log().Debug("Ethereum Peer connected", "name", p.Name())
+
+	// Execute the Ethereum handshake
+	var (
+		genesis = pm.Blockchain.Genesis()
+		head    = pm.Blockchain.CurrentHeader()
+		hash    = head.Hash()
+		number  = head.Number.Uint64()
+		td      = pm.Blockchain.GetTd(hash, number)
+	)
+	if err := p.Handshake(pm.NetworkId, td, hash, genesis.Hash()); err != nil {
+		p.Log().Debug("Ethereum handshake failed", "err", err)
+		return err
+	}
+	if rw, ok := p.Rw.(*eth.MeteredMsgReadWriter); ok {
+		rw.Init(p.Version)
+	}
+	// Register the Peer locally
+	if err := pm.Peers.Register(p); err != nil {
+		p.Log().Error("Ethereum Peer registration failed", "err", err)
+		return err
+	}
+	defer pm.RemovePeer(p.Id)
+
+	// Register the Peer in the Downloader. If the Downloader considers it banned, we disconnect
+	if err := pm.Downloader.RegisterPeer(p.Id, p.Version, p); err != nil {
+		return err
+	}
+	// Propagate existing transactions. new transactions appearing
+	// after this will be sent via broadcasts.
+	pm.SyncTransactions(p)
+
+	// If we're DAO hard-fork aware, validate any remote Peer with regard to the hard-fork
+	if daoBlock := pm.Chainconfig.DAOForkBlock; daoBlock != nil {
+		// Request the Peer's DAO fork header for extra-data validation
+		if err := p.RequestHeadersByNumber(daoBlock.Uint64(), 1, 0, false); err != nil {
+			return err
+		}
+		// Start a timer to disconnect if the Peer doesn't reply in time
+		p.ForkDrop = time.AfterFunc(eth.DaoChallengeTimeout, func() {
+			p.Log().Debug("Timed out DAO fork-check, dropping")
+			pm.RemovePeer(p.Id)
+		})
+		// Make sure it's cleaned up if the Peer dies off
+		defer func() {
+			if p.ForkDrop != nil {
+				p.ForkDrop.Stop()
+				p.ForkDrop = nil
+			}
+		}()
+	}
+	// main loop. Handle incoming messages.
+	for {
+		if err := pm.handleMsg(p); err != nil {
+			p.Log().Debug("Ethereum message handling failed", "err", err)
+			return err
+		}
+	}
+}
+
+
+// Mined broadcast loop
+func (self *TomoProtocolManager) minedBroadcastLoop() {
+	// automatically stops if unsubscribe
+	for obj := range self.MinedBlockSub.Chan() {
+		switch ev := obj.Data.(type) {
+		case core.NewMinedBlockEvent:
+			self.BroadcastBlock(ev.Block, true)  // First propagate Block to Peers
+			self.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+		}
+	}
+}
+
+func (self *TomoProtocolManager) txBroadcastLoop() {
+	for {
+		select {
+		case event := <-self.TxCh:
+			self.BroadcastTx(event.Tx.Hash(), event.Tx)
+
+			// Err() channel will be Closed when unsubscribing.
+		case <-self.TxSub.Err():
+			return
+		}
+	}
+}
+
+
+
+// NodeInfo retrieves some protocol metadata about the running host node.
+func (self *TomoProtocolManager) NodeInfo() *eth.NodeInfo {
+	currentBlock := self.Blockchain.GetCurrentBlock()
+	return &eth.NodeInfo{
+		Network:    self.NetworkId,
+		Difficulty: self.Blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64()),
+		Genesis:    self.Blockchain.Genesis().Hash(),
+		Config:     self.Blockchain.Config(),
+		Head:       currentBlock.Hash(),
+	}
+}
+

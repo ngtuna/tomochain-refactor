@@ -103,11 +103,11 @@ var AppHelpFlagGroups = []flagGroup{
 	//{
 	//	Name: "DASHBOARD",
 	//	Flags: []cli.Flag{
-	//		utils.DashboardEnabledFlag,
-	//		utils.DashboardAddrFlag,
-	//		utils.DashboardPortFlag,
-	//		utils.DashboardRefreshFlag,
-	//		utils.DashboardAssetsFlag,
+	//		configs.DashboardEnabledFlag,
+	//		configs.DashboardAddrFlag,
+	//		configs.DashboardPortFlag,
+	//		configs.DashboardRefreshFlag,
+	//		configs.DashboardAssetsFlag,
 	//	},
 	//},
 	{

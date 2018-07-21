@@ -509,9 +509,9 @@ type peerSetNotify interface {
 	unregisterPeer(*peer)
 }
 
-// peerSet represents the collection of active peers currently participating in
+// PeerSet represents the collection of active peers currently participating in
 // the Light Ethereum sub-protocol.
-type peerSet struct {
+type PeerSet struct {
 	peers      map[string]*peer
 	lock       sync.RWMutex
 	notifyList []peerSetNotify
@@ -519,14 +519,14 @@ type peerSet struct {
 }
 
 // NewPeerSet creates a new peer set to track the active participants.
-func NewPeerSet() *peerSet {
-	return &peerSet{
+func NewPeerSet() *PeerSet {
+	return &PeerSet{
 		peers: make(map[string]*peer),
 	}
 }
 
 // notify adds a service to be notified about added or removed peers
-func (ps *peerSet) notify(n peerSetNotify) {
+func (ps *PeerSet) notify(n peerSetNotify) {
 	ps.lock.Lock()
 	ps.notifyList = append(ps.notifyList, n)
 	peers := make([]*peer, 0, len(ps.peers))
@@ -542,7 +542,7 @@ func (ps *peerSet) notify(n peerSetNotify) {
 
 // Register injects a new peer into the working set, or returns an error if the
 // peer is already known.
-func (ps *peerSet) Register(p *peer) error {
+func (ps *PeerSet) Register(p *peer) error {
 	ps.lock.Lock()
 	if ps.closed {
 		return errClosed
@@ -564,7 +564,7 @@ func (ps *peerSet) Register(p *peer) error {
 
 // Unregister removes a remote peer from the active set, disabling any further
 // actions to/from that particular entity. It also initiates disconnection at the networking layer.
-func (ps *peerSet) Unregister(id string) error {
+func (ps *PeerSet) Unregister(id string) error {
 	ps.lock.Lock()
 	if p, ok := ps.peers[id]; !ok {
 		ps.lock.Unlock()
@@ -585,7 +585,7 @@ func (ps *peerSet) Unregister(id string) error {
 }
 
 // AllPeerIDs returns a list of all registered peer IDs
-func (ps *peerSet) AllPeerIDs() []string {
+func (ps *PeerSet) AllPeerIDs() []string {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -599,7 +599,7 @@ func (ps *peerSet) AllPeerIDs() []string {
 }
 
 // Peer retrieves the registered peer with the given id.
-func (ps *peerSet) Peer(id string) *peer {
+func (ps *PeerSet) Peer(id string) *peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -607,7 +607,7 @@ func (ps *peerSet) Peer(id string) *peer {
 }
 
 // Len returns if the current number of peers in the set.
-func (ps *peerSet) Len() int {
+func (ps *PeerSet) Len() int {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -615,7 +615,7 @@ func (ps *peerSet) Len() int {
 }
 
 // BestPeer retrieves the known peer with the currently highest total difficulty.
-func (ps *peerSet) BestPeer() *peer {
+func (ps *PeerSet) BestPeer() *peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -632,7 +632,7 @@ func (ps *peerSet) BestPeer() *peer {
 }
 
 // AllPeers returns all peers in a list
-func (ps *peerSet) AllPeers() []*peer {
+func (ps *PeerSet) AllPeers() []*peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -647,7 +647,7 @@ func (ps *peerSet) AllPeers() []*peer {
 
 // Close disconnects all peers.
 // No new peers can be registered after Close has returned.
-func (ps *peerSet) Close() {
+func (ps *PeerSet) Close() {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 

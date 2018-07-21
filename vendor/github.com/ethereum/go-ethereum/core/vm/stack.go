@@ -28,7 +28,7 @@ type Stack struct {
 	data []*big.Int
 }
 
-func newstack() *Stack {
+func Newstack() *Stack {
 	return &Stack{data: make([]*big.Int, 0, 1024)}
 }
 
@@ -36,45 +36,45 @@ func (st *Stack) Data() []*big.Int {
 	return st.data
 }
 
-func (st *Stack) push(d *big.Int) {
-	// NOTE push limit (1024) is checked in baseCheck
+func (st *Stack) Push(d *big.Int) {
+	// NOTE Push limit (1024) is checked in baseCheck
 	//stackItem := new(big.Int).Set(d)
 	//st.data = append(st.data, stackItem)
 	st.data = append(st.data, d)
 }
-func (st *Stack) pushN(ds ...*big.Int) {
+func (st *Stack) PushN(ds ...*big.Int) {
 	st.data = append(st.data, ds...)
 }
 
-func (st *Stack) pop() (ret *big.Int) {
+func (st *Stack) Pop() (ret *big.Int) {
 	ret = st.data[len(st.data)-1]
 	st.data = st.data[:len(st.data)-1]
 	return
 }
 
-func (st *Stack) len() int {
+func (st *Stack) Len() int {
 	return len(st.data)
 }
 
-func (st *Stack) swap(n int) {
-	st.data[st.len()-n], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-n]
+func (st *Stack) Swap(n int) {
+	st.data[st.Len()-n], st.data[st.Len()-1] = st.data[st.Len()-1], st.data[st.Len()-n]
 }
 
-func (st *Stack) dup(pool *intPool, n int) {
-	st.push(pool.get().Set(st.data[st.len()-n]))
+func (st *Stack) Dup(pool *IntPool, n int) {
+	st.Push(pool.Get().Set(st.data[st.Len()-n]))
 }
 
-func (st *Stack) peek() *big.Int {
-	return st.data[st.len()-1]
+func (st *Stack) Peek() *big.Int {
+	return st.data[st.Len()-1]
 }
 
-// Back returns the n'th item in stack
+// Back Returns the n'th item in stack
 func (st *Stack) Back(n int) *big.Int {
-	return st.data[st.len()-n-1]
+	return st.data[st.Len()-n-1]
 }
 
-func (st *Stack) require(n int) error {
-	if st.len() < n {
+func (st *Stack) Require(n int) error {
+	if st.Len() < n {
 		return fmt.Errorf("stack underflow (%d <=> %d)", len(st.data), n)
 	}
 	return nil

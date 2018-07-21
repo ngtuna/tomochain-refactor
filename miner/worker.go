@@ -42,7 +42,40 @@ import (
 
 	tomoCore "github.com/tomochain/tomochain/core"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
+
+// Agent can register themself with the Worker
+type Agent interface {
+	Work() chan<- *Work
+	SetReturnCh(chan<- *Result)
+	Stop()
+	Start()
+	GetHashRate() int64
+}
+type Work struct {
+	Config *params.ChainConfig
+	Signer types.Signer
+
+	State     *state.StateDB // apply State changes here
+	Ancestors *set.Set       // ancestor set (used for checking uncle parent validity)
+	Family    *set.Set       // Family set (used for checking uncle invalidity)
+	Uncles    *set.Set       // uncle set
+	Tcount    int            // tx count in cycle
+
+	Block *types.Block // the new block
+
+	Header   *types.Header
+	Txs      []*types.Transaction
+	Receipts []*types.Receipt
+
+	CreatedAt time.Time
+}
+
+type Result struct {
+	Work  *Work
+	Block *types.Block
+}
 
 // Worker is the main object which takes care of applying messages to the new state
 type Worker struct {
@@ -61,11 +94,11 @@ type Worker struct {
 	ChainSideSub event.Subscription
 	Wg           sync.WaitGroup
 
-	Agents map[miner.Agent]struct{}
-	Recv   chan *miner.Result
+	Agents map[Agent]struct{}
+	Recv   chan *Result
 
-	Eth     miner.Backend
-	Chain   *core.BlockChain
+	Eth     Backend
+	Chain   *tomoCore.TomoBlockChain
 	Proc    core.Validator
 	ChainDb ethdb.Database
 
@@ -73,7 +106,7 @@ type Worker struct {
 	Extra    []byte
 
 	CurrentMu sync.Mutex
-	Current   *miner.Work
+	Current   *Work
 
 	UncleMu        sync.Mutex
 	PossibleUncles map[common.Hash]*types.Block
@@ -85,7 +118,7 @@ type Worker struct {
 	AtWork int32
 }
 
-func NewWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth miner.Backend, mux *event.TypeMux) *Worker {
+func NewWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *Worker {
 	worker := &Worker{
 		Config:         config,
 		Engine:         engine,
@@ -95,12 +128,12 @@ func NewWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 		ChainHeadCh:    make(chan core.ChainHeadEvent, miner.ChainHeadChanSize),
 		ChainSideCh:    make(chan core.ChainSideEvent, miner.ChainSideChanSize),
 		ChainDb:        eth.GetChainDb(),
-		Recv:           make(chan *miner.Result, miner.ResultQueueSize),
+		Recv:           make(chan *Result, miner.ResultQueueSize),
 		Chain:          eth.BlockChain(),
 		Proc:           eth.BlockChain().GetValidator(),
 		PossibleUncles: make(map[common.Hash]*types.Block),
 		Coinbase:       coinbase,
-		Agents:         make(map[miner.Agent]struct{}),
+		Agents:         make(map[Agent]struct{}),
 		Unconfirmed:    miner.NewUnconfirmedBlocks(eth.BlockChain(), miner.MiningLogAtDepth),
 	}
 	// Subscribe TxPreEvent for tx pool
@@ -386,14 +419,14 @@ func (self *Worker) stop() {
 	atomic.StoreInt32(&self.AtWork, 0)
 }
 
-func (self *Worker) register(agent miner.Agent) {
+func (self *Worker) register(agent Agent) {
 	self.Mu.Lock()
 	defer self.Mu.Unlock()
 	self.Agents[agent] = struct{}{}
 	agent.SetReturnCh(self.Recv)
 }
 
-func (self *Worker) unregister(agent miner.Agent) {
+func (self *Worker) unregister(agent Agent) {
 	self.Mu.Lock()
 	defer self.Mu.Unlock()
 	delete(self.Agents, agent)
@@ -448,7 +481,7 @@ func (self *Worker) Update() {
 }
 
 // push sends a new work task to currently live miner Agents.
-func (self *Worker) push(work *miner.Work) {
+func (self *Worker) push(work *Work) {
 	if atomic.LoadInt32(&self.Mining) != 1 {
 		return
 	}
@@ -466,7 +499,7 @@ func (self *Worker) makeCurrent(parent *types.Block, header *types.Header) error
 	if err != nil {
 		return err
 	}
-	work := &miner.Work{
+	work := &Work{
 		Config:    self.Config,
 		Signer:    types.NewEIP155Signer(self.Config.ChainId),
 		State:     state,
@@ -492,7 +525,7 @@ func (self *Worker) makeCurrent(parent *types.Block, header *types.Header) error
 	return nil
 }
 
-func (self *Worker) commitUncle(work *miner.Work, uncle *types.Header) error {
+func (self *Worker) commitUncle(work *Work, uncle *types.Header) error {
 	hash := uncle.Hash()
 	if work.Uncles.Has(hash) {
 		return fmt.Errorf("uncle not unique")
@@ -506,3 +539,104 @@ func (self *Worker) commitUncle(work *miner.Work, uncle *types.Header) error {
 	work.Uncles.Add(uncle.Hash())
 	return nil
 }
+
+
+
+
+func (env *Work) CommitTransactions(mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *tomoCore.TomoBlockChain, coinbase common.Address) {
+	gp := new(core.GasPool).AddGas(env.Header.GasLimit)
+
+	var coalescedLogs []*types.Log
+
+	for {
+		// If we don't have enough gas for any further transactions then we're done
+		if gp.Gas() < params.TxGas {
+			log.Trace("Not enough gas for further transactions", "gp", gp)
+			break
+		}
+		// Retrieve the next transaction and abort if all done
+		tx := txs.Peek()
+		if tx == nil {
+			break
+		}
+		// Error may be ignored here. The error has already been checked
+		// during transaction acceptance is the transaction pool.
+		//
+		// We use the eip155 Signer regardless of the Current hf.
+		from, _ := types.Sender(env.Signer, tx)
+		// Check whether the tx is replay protected. If we're not in the EIP155 hf
+		// phase, start ignoring the sender until we do.
+		if tx.Protected() && !env.Config.IsEIP155(env.Header.Number) {
+			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", env.Config.EIP155Block)
+
+			txs.Pop()
+			continue
+		}
+		// Start executing the transaction
+		env.State.Prepare(tx.Hash(), common.Hash{}, env.Tcount)
+
+		err, logs := env.commitTransaction(tx, bc, coinbase, gp)
+		switch err {
+		case core.ErrGasLimitReached:
+			// Pop the Current out-of-gas transaction without shifting in the next from the account
+			log.Trace("Gas limit exceeded for Current block", "sender", from)
+			txs.Pop()
+
+		case core.ErrNonceTooLow:
+			// New head notification data race between the transaction pool and miner, shift
+			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+			txs.Shift()
+
+		case core.ErrNonceTooHigh:
+			// Reorg notification data race between the transaction pool and miner, skip account =
+			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+			txs.Pop()
+
+		case nil:
+			// Everything ok, collect the logs and shift in the next transaction from the same account
+			coalescedLogs = append(coalescedLogs, logs...)
+			env.Tcount++
+			txs.Shift()
+
+		default:
+			// Strange error, discard the transaction and get the next in line (note, the
+			// nonce-too-high clause will prevent us from executing in vain).
+			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
+			txs.Shift()
+		}
+	}
+
+	if len(coalescedLogs) > 0 || env.Tcount > 0 {
+		// make a copy, the State caches the logs and these logs get "upgraded" from pending to mined
+		// logs by filling in the block hash when the block was mined by the local miner. This can
+		// cause a race condition if a log was "upgraded" before the PendingLogsEvent is processed.
+		cpy := make([]*types.Log, len(coalescedLogs))
+		for i, l := range coalescedLogs {
+			cpy[i] = new(types.Log)
+			*cpy[i] = *l
+		}
+		go func(logs []*types.Log, tcount int) {
+			if len(logs) > 0 {
+				mux.Post(core.PendingLogsEvent{Logs: logs})
+			}
+			if tcount > 0 {
+				mux.Post(core.PendingStateEvent{})
+			}
+		}(cpy, env.Tcount)
+	}
+}
+
+func (env *Work) commitTransaction(tx *types.Transaction, bc *tomoCore.TomoBlockChain, coinbase common.Address, gp *core.GasPool) (error, []*types.Log) {
+	snap := env.State.Snapshot()
+
+	receipt, _, err := tomoCore.ApplyTransaction(env.Config, bc, &coinbase, gp, env.State, env.Header, tx, &env.Header.GasUsed, vm.Config{})
+	if err != nil {
+		env.State.RevertToSnapshot(snap)
+		return err, nil
+	}
+	env.Txs = append(env.Txs, tx)
+	env.Receipts = append(env.Receipts, receipt)
+
+	return nil, receipt.Logs
+}
+
