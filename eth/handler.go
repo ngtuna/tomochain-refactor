@@ -30,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/eth/fetcher"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -43,6 +42,8 @@ import (
 	"github.com/tomochain/tomochain/consensus"
 	tomoCore "github.com/tomochain/tomochain/core"
 	"sync"
+
+	tomoFetcher "github.com/tomochain/tomochain/eth/fetcher"
 )
 
 type TomoProtocolManager struct {
@@ -57,7 +58,7 @@ type TomoProtocolManager struct {
 	MaxPeers    int
 
 	Downloader *downloader.Downloader
-	Fetcher    *fetcher.Fetcher
+	Fetcher    *tomoFetcher.TomoFetcher
 	Peers      *eth.PeerSet
 
 	SubProtocols []p2p.Protocol
@@ -159,7 +160,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		atomic.StoreUint32(&manager.AcceptTxs, 1) // Mark initial sync done on any fetcher import
 		return manager.Blockchain.InsertChain(blocks)
 	}
-	manager.Fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.RemovePeer)
+	manager.Fetcher = tomoFetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.RemovePeer)
 
 	return manager, nil
 }
@@ -575,8 +576,6 @@ func (pm *TomoProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transacti
 	log.Trace("Broadcast transaction", "hash", hash, "recipients", len(peers))
 }
 
-
-
 func (pm *TomoProtocolManager) RemovePeer(id string) {
 	// Short circuit if the Peer was already removed
 	peer := pm.Peers.Peer(id)
@@ -709,7 +708,6 @@ func (pm *TomoProtocolManager) Handle(p *eth.Peer) error {
 	}
 }
 
-
 // Mined broadcast loop
 func (self *TomoProtocolManager) minedBroadcastLoop() {
 	// automatically stops if unsubscribe
@@ -735,8 +733,6 @@ func (self *TomoProtocolManager) txBroadcastLoop() {
 	}
 }
 
-
-
 // NodeInfo retrieves some protocol metadata about the running host node.
 func (self *TomoProtocolManager) NodeInfo() *eth.NodeInfo {
 	currentBlock := self.Blockchain.GetCurrentBlock()
@@ -748,4 +744,3 @@ func (self *TomoProtocolManager) NodeInfo() *eth.NodeInfo {
 		Head:       currentBlock.Hash(),
 	}
 }
-

@@ -25,12 +25,41 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/eth/fetcher"
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 // Fetcher is responsible for accumulating block announcements from various peers
 // and scheduling them for retrieval.
 type TomoFetcher struct {
 	fetcher.Fetcher
+}
+
+// New creates a Block fetcher to retrieve blocks based on Hash announcements.
+func New(getBlock fetcher.BlockRetrievalFn, verifyHeader fetcher.HeaderVerifierFn, broadcastBlock fetcher.BlockBroadcasterFn, chainHeight fetcher.ChainHeightFn, insertChain fetcher.ChainInsertFn, dropPeer fetcher.PeerDropFn) *TomoFetcher {
+	return &TomoFetcher{fetcher.Fetcher{
+		Notify:         make(chan *fetcher.Announce),
+		Inject:         make(chan *fetcher.Inject),
+		BlockFilter:    make(chan chan []*types.Block),
+		HeaderFilter:   make(chan chan *fetcher.HeaderFilterTask),
+		BodyFilter:     make(chan chan *fetcher.BodyFilterTask),
+		Done:           make(chan common.Hash),
+		Quit:           make(chan struct{}),
+		Announces:      make(map[string]int),
+		Announced:      make(map[common.Hash][]*fetcher.Announce),
+		Fetching:       make(map[common.Hash]*fetcher.Announce),
+		Fetched:        make(map[common.Hash][]*fetcher.Announce),
+		Completing:     make(map[common.Hash]*fetcher.Announce),
+		Queue:          prque.New(),
+		Queues:         make(map[string]int),
+		Queued:         make(map[common.Hash]*fetcher.Inject),
+		GetBlock:       getBlock,
+		VerifyHeader:   verifyHeader,
+		BroadcastBlock: broadcastBlock,
+		ChainHeight:    chainHeight,
+		InsertChain:    insertChain,
+		DropPeer:       dropPeer,
+	},
+	}
 }
 
 // Loop is the main fetcher loop, checking and processing various notification
@@ -324,6 +353,6 @@ func (f *TomoFetcher) loop() {
 }
 
 // Bind import hook when block imported into chain.
-func SetImportedHook(f *fetcher.Fetcher ,importedHook func(*types.Block)) {
+func SetImportedHook(f *TomoFetcher, importedHook func(*types.Block)) {
 	f.ImportedHook = importedHook
 }

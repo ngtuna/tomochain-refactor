@@ -43,8 +43,8 @@ var (
 	errTerminated = errors.New("terminated")
 )
 
-// blockRetrievalFn is a callback type for retrieving a Block from the local chain.
-type blockRetrievalFn func(common.Hash) *types.Block
+// BlockRetrievalFn is a callback type for retrieving a Block from the local chain.
+type BlockRetrievalFn func(common.Hash) *types.Block
 
 // headerRequesterFn is a callback type for sending a Header retrieval request.
 type headerRequesterFn func(common.Hash) error
@@ -52,20 +52,20 @@ type headerRequesterFn func(common.Hash) error
 // bodyRequesterFn is a callback type for sending a body retrieval request.
 type bodyRequesterFn func([]common.Hash) error
 
-// headerVerifierFn is a callback type to verify a Block's Header for fast propagation.
-type headerVerifierFn func(header *types.Header) error
+// HeaderVerifierFn is a callback type to verify a Block's Header for fast propagation.
+type HeaderVerifierFn func(header *types.Header) error
 
-// blockBroadcasterFn is a callback type for broadcasting a Block to connected peers.
-type blockBroadcasterFn func(block *types.Block, propagate bool)
+// BlockBroadcasterFn is a callback type for broadcasting a Block to connected peers.
+type BlockBroadcasterFn func(block *types.Block, propagate bool)
 
-// chainHeightFn is a callback type to retrieve the current chain height.
-type chainHeightFn func() uint64
+// ChainHeightFn is a callback type to retrieve the current chain height.
+type ChainHeightFn func() uint64
 
-// chainInsertFn is a callback type to Insert a batch of blocks into the local chain.
-type chainInsertFn func(types.Blocks) (int, error)
+// ChainInsertFn is a callback type to Insert a batch of blocks into the local chain.
+type ChainInsertFn func(types.Blocks) (int, error)
 
-// peerDropFn is a callback type for dropping a Peer detected as malicious.
-type peerDropFn func(id string)
+// PeerDropFn is a callback type for dropping a Peer detected as malicious.
+type PeerDropFn func(id string)
 
 // Announce is the Hash notification of the availability of a new Block in the
 // network.
@@ -130,12 +130,12 @@ type Fetcher struct {
 	Queued map[common.Hash]*Inject // Set of already Queued blocks (to dedup imports)
 
 	// Callbacks
-	GetBlock       blockRetrievalFn   // Retrieves a Block from the local chain
-	VerifyHeader   headerVerifierFn   // Checks if a Block's Headers have a valid proof of work
-	BroadcastBlock blockBroadcasterFn // Broadcasts a Block to connected peers
-	ChainHeight    chainHeightFn      // Retrieves the current chain's height
-	InsertChain    chainInsertFn      // Injects a batch of blocks into the chain
-	DropPeer       peerDropFn         // Drops a Peer for misbehaving
+	GetBlock       BlockRetrievalFn   // Retrieves a Block from the local chain
+	VerifyHeader   HeaderVerifierFn   // Checks if a Block's Headers have a valid proof of work
+	BroadcastBlock BlockBroadcasterFn // Broadcasts a Block to connected peers
+	ChainHeight    ChainHeightFn      // Retrieves the current chain's height
+	InsertChain    ChainInsertFn      // Injects a batch of blocks into the chain
+	DropPeer       PeerDropFn         // Drops a Peer for misbehaving
 
 	// Testing hooks
 	AnnounceChangeHook func(common.Hash, bool) // Method to call upon adding or deleting a Hash from the Announce list
@@ -146,7 +146,7 @@ type Fetcher struct {
 }
 
 // New creates a Block fetcher to retrieve blocks based on Hash announcements.
-func New(getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBlock blockBroadcasterFn, chainHeight chainHeightFn, insertChain chainInsertFn, dropPeer peerDropFn) *Fetcher {
+func New(getBlock BlockRetrievalFn, verifyHeader HeaderVerifierFn, broadcastBlock BlockBroadcasterFn, chainHeight ChainHeightFn, insertChain ChainInsertFn, dropPeer PeerDropFn) *Fetcher {
 	return &Fetcher{
 		Notify:         make(chan *Announce),
 		Inject:         make(chan *Inject),
