@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/contracts/blocksigner"
+
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -14,6 +14,8 @@ import (
 	"math/big"
 	"math/rand"
 	"testing"
+	"github.com/tomochain/tomochain/contracts/blocksigner"
+	ethCommon "github.com/ethereum/go-ethereum/common"
 )
 
 func TestSendTxSign(t *testing.T) {
@@ -97,7 +99,7 @@ func TestSendTxSign(t *testing.T) {
 		}
 	}
 
-	signers := make(map[common.Address]*rewardLog)
+	signers := make(map[ethCommon.Address]*rewardLog)
 	totalSigner := uint64(17)
 	signers[common.HexToAddress("0x12f588d7d03bb269b382b842fc15d874e8c055a7")] = &rewardLog{5, new(big.Int).SetUint64(0)}
 	signers[common.HexToAddress("0x1f9e122c0921a4504fc116d967baf7a7bf2604ef")] = &rewardLog{6, new(big.Int).SetUint64(0)}

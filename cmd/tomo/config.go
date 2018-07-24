@@ -25,15 +25,18 @@ import (
 	"reflect"
 	"unicode"
 
-	cli "gopkg.in/urfave/cli.v1"
+	"gopkg.in/urfave/cli.v1"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/dashboard"
 	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/node"
+
 	"github.com/ethereum/go-ethereum/params"
 	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/naoina/toml"
+	"github.com/tomochain/tomochain/cmd/utils"
+	"github.com/ethereum/go-ethereum/node"
+
+	"github.com/tomochain/tomochain/configs"
 )
 
 var (
@@ -74,15 +77,7 @@ type ethstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
-type tomoConfig struct {
-	Eth       eth.Config
-	Shh       whisper.Config
-	Node      node.Config
-	Ethstats  ethstatsConfig
-	Dashboard dashboard.Config
-}
-
-func loadConfig(file string, cfg *tomoConfig) error {
+func loadConfig(file string, cfg *configs.TomoConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -107,9 +102,9 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-func makeConfigNode(ctx *cli.Context) (*node.Node, tomoConfig) {
+func makeConfigNode(ctx *cli.Context) (*node.Node, configs.TomoConfig) {
 	// Load defaults.
-	cfg := tomoConfig{
+	cfg := configs.TomoConfig{
 		Eth:       eth.DefaultConfig,
 		Shh:       whisper.DefaultConfig,
 		Node:      defaultNodeConfig(),
@@ -122,7 +117,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tomoConfig) {
 			utils.Fatalf("%v", err)
 		}
 	}
-
+	configs.Config = cfg
 	// Apply flags.
 	utils.SetNodeConfig(ctx, &cfg.Node)
 	stack, err := node.New(&cfg.Node)
@@ -171,7 +166,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 		utils.RegisterShhService(stack, &cfg.Shh)
 	}
 
-	// Add the Ethereum Stats daemon if requested.
+	// Add the TomoChain Stats daemon if requested.
 	if cfg.Ethstats.URL != "" {
 		utils.RegisterEthStatsService(stack, cfg.Ethstats.URL)
 	}

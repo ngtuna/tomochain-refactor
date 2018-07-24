@@ -3,8 +3,8 @@
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// the Free Software Foundation, either Version 3 of the License, or
+// (at your option) any later Version.
 //
 // The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,26 +26,14 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/eth"
 )
 
-const (
-	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
-	minDesiredPeerCount = 5                // Amount of peers desired to start syncing
 
-	// This is the target size for the packs of transactions sent by txsyncLoop.
-	// A pack can get larger than this if a single transactions exceeds this size.
-	txsyncPackSize = 100 * 1024
-)
-
-type txsync struct {
-	p   *peer
-	txs []*types.Transaction
-}
-
-// syncTransactions starts sending all currently pending transactions to the given peer.
-func (pm *ProtocolManager) syncTransactions(p *peer) {
+// SyncTransactions starts sending all currently pending transactions to the given Peer.
+func (pm *TomoProtocolManager) SyncTransactions(p *eth.Peer) {
 	var txs types.Transactions
-	pending, _ := pm.txpool.Pending()
+	pending, _ := pm.Txpool.GetPending()
 	for _, batch := range pending {
 		txs = append(txs, batch...)
 	}
@@ -53,46 +41,46 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 		return
 	}
 	select {
-	case pm.txsyncCh <- &txsync{p, txs}:
-	case <-pm.quitSync:
+	case pm.TxsyncCh <- &eth.Txsync{p, txs}:
+	case <-pm.QuitSync:
 	}
 }
 
 // txsyncLoop takes care of the initial transaction sync for each new
-// connection. When a new peer appears, we relay all currently pending
+// connection. When a new Peer appears, we relay all currently pending
 // transactions. In order to minimise egress bandwidth usage, we send
-// the transactions in small packs to one peer at a time.
-func (pm *ProtocolManager) txsyncLoop() {
+// the transactions in small packs to one Peer at a time.
+func (pm *TomoProtocolManager) txsyncLoop() {
 	var (
-		pending = make(map[discover.NodeID]*txsync)
+		pending = make(map[discover.NodeID]*eth.Txsync)
 		sending = false               // whether a send is active
-		pack    = new(txsync)         // the pack that is being sent
+		pack    = new(eth.Txsync)         // the pack that is being sent
 		done    = make(chan error, 1) // result of the send
 	)
 
 	// send starts a sending a pack of transactions from the sync.
-	send := func(s *txsync) {
+	send := func(s *eth.Txsync) {
 		// Fill pack with transactions up to the target size.
 		size := common.StorageSize(0)
-		pack.p = s.p
-		pack.txs = pack.txs[:0]
-		for i := 0; i < len(s.txs) && size < txsyncPackSize; i++ {
-			pack.txs = append(pack.txs, s.txs[i])
-			size += s.txs[i].Size()
+		pack.P = s.P
+		pack.Txs = pack.Txs[:0]
+		for i := 0; i < len(s.Txs) && size < eth.TxsyncPackSize; i++ {
+			pack.Txs = append(pack.Txs, s.Txs[i])
+			size += s.Txs[i].Size()
 		}
 		// Remove the transactions that will be sent.
-		s.txs = s.txs[:copy(s.txs, s.txs[len(pack.txs):])]
-		if len(s.txs) == 0 {
-			delete(pending, s.p.ID())
+		s.Txs = s.Txs[:copy(s.Txs, s.Txs[len(pack.Txs):])]
+		if len(s.Txs) == 0 {
+			delete(pending, s.P.ID())
 		}
 		// Send the pack in the background.
-		s.p.Log().Trace("Sending batch of transactions", "count", len(pack.txs), "bytes", size)
+		s.P.Log().Trace("Sending batch of transactions", "count", len(pack.Txs), "bytes", size)
 		sending = true
-		go func() { done <- pack.p.SendTransactions(pack.txs) }()
+		go func() { done <- pack.P.SendTransactions(pack.Txs) }()
 	}
 
 	// pick chooses the next pending sync.
-	pick := func() *txsync {
+	pick := func() *eth.Txsync {
 		if len(pending) == 0 {
 			return nil
 		}
@@ -107,23 +95,23 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 	for {
 		select {
-		case s := <-pm.txsyncCh:
-			pending[s.p.ID()] = s
+		case s := <-pm.TxsyncCh:
+			pending[s.P.ID()] = s
 			if !sending {
 				send(s)
 			}
 		case err := <-done:
 			sending = false
-			// Stop tracking peers that cause send failures.
+			// Stop tracking Peers that cause send failures.
 			if err != nil {
-				pack.p.Log().Debug("Transaction send failed", "err", err)
-				delete(pending, pack.p.ID())
+				pack.P.Log().Debug("Transaction send failed", "err", err)
+				delete(pending, pack.P.ID())
 			}
 			// Schedule the next send.
 			if s := pick(); s != nil {
 				send(s)
 			}
-		case <-pm.quitSync:
+		case <-pm.QuitSync:
 			return
 		}
 	}
@@ -131,87 +119,87 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 // syncer is responsible for periodically synchronising with the network, both
 // downloading hashes and blocks as well as handling the announcement handler.
-func (pm *ProtocolManager) syncer() {
+func (pm *TomoProtocolManager) syncer() {
 	// Start and ensure cleanup of sync mechanisms
-	pm.fetcher.Start()
-	defer pm.fetcher.Stop()
-	defer pm.downloader.Terminate()
+	pm.Fetcher.Start()
+	defer pm.Fetcher.Stop()
+	defer pm.Downloader.Terminate()
 
 	// Wait for different events to fire synchronisation operations
-	forceSync := time.NewTicker(forceSyncCycle)
+	forceSync := time.NewTicker(eth.ForceSyncCycle)
 	defer forceSync.Stop()
 
 	for {
 		select {
-		case <-pm.newPeerCh:
-			// Make sure we have peers to select from, then sync
-			if pm.peers.Len() < minDesiredPeerCount {
+		case <-pm.NewPeerCh:
+			// Make sure we have Peers to select from, then sync
+			if pm.Peers.Len() < eth.MinDesiredPeerCount {
 				break
 			}
-			go pm.synchronise(pm.peers.BestPeer())
+			go pm.Synchronise(pm.Peers.BestPeer())
 
 		case <-forceSync.C:
-			// Force a sync even if not enough peers are present
-			go pm.synchronise(pm.peers.BestPeer())
+			// Force a sync even if not enough Peers are present
+			go pm.Synchronise(pm.Peers.BestPeer())
 
-		case <-pm.noMorePeers:
+		case <-pm.NoMorePeers:
 			return
 		}
 	}
 }
 
-// synchronise tries to sync up our local block chain with a remote peer.
-func (pm *ProtocolManager) synchronise(peer *peer) {
-	// Short circuit if no peers are available
+// Synchronise tries to sync up our local Block chain with a remote Peer.
+func (pm *TomoProtocolManager) Synchronise(peer *eth.Peer) {
+	// Short circuit if no Peers are available
 	if peer == nil {
 		return
 	}
-	// Make sure the peer's TD is higher than our own
-	currentBlock := pm.blockchain.CurrentBlock()
-	td := pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
+	// Make sure the Peer's TD is higher than our own
+	currentBlock := pm.Blockchain.GetCurrentBlock()
+	td := pm.Blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 
-	pHead, pTd := peer.Head()
+	pHead, pTd := peer.GetHead()
 	if pTd.Cmp(td) <= 0 {
 		return
 	}
-	// Otherwise try to sync with the downloader
+	// Otherwise try to sync with the Downloader
 	mode := downloader.FullSync
-	if atomic.LoadUint32(&pm.fastSync) == 1 {
+	if atomic.LoadUint32(&pm.FastSync) == 1 {
 		// Fast sync was explicitly requested, and explicitly granted
 		mode = downloader.FastSync
-	} else if currentBlock.NumberU64() == 0 && pm.blockchain.CurrentFastBlock().NumberU64() > 0 {
-		// The database seems empty as the current block is the genesis. Yet the fast
-		// block is ahead, so fast sync was enabled for this node at a certain point.
+	} else if currentBlock.NumberU64() == 0 && pm.Blockchain.GetCurrentFastBlock().NumberU64() > 0 {
+		// The database seems empty as the current Block is the genesis. Yet the fast
+		// Block is ahead, so fast sync was enabled for this node at a certain point.
 		// The only scenario where this can happen is if the user manually (or via a
-		// bad block) rolled back a fast sync node below the sync point. In this case
+		// bad Block) rolled back a fast sync node below the sync point. In this case
 		// however it's safe to reenable fast sync.
-		atomic.StoreUint32(&pm.fastSync, 1)
+		atomic.StoreUint32(&pm.FastSync, 1)
 		mode = downloader.FastSync
 	}
 
 	if mode == downloader.FastSync {
-		// Make sure the peer's total difficulty we are synchronizing is higher.
-		if pm.blockchain.GetTdByHash(pm.blockchain.CurrentFastBlock().Hash()).Cmp(pTd) >= 0 {
+		// Make sure the Peer's total difficulty we are synchronizing is higher.
+		if pm.Blockchain.GetTdByHash(pm.Blockchain.GetCurrentFastBlock().Hash()).Cmp(pTd) >= 0 {
 			return
 		}
 	}
 
-	// Run the sync cycle, and disable fast sync if we've went past the pivot block
-	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
+	// Run the sync cycle, and disable fast sync if we've went past the pivot Block
+	if err := pm.Downloader.Synchronise(peer.Id, pHead, pTd, mode); err != nil {
 		return
 	}
-	if atomic.LoadUint32(&pm.fastSync) == 1 {
+	if atomic.LoadUint32(&pm.FastSync) == 1 {
 		log.Info("Fast sync complete, auto disabling")
-		atomic.StoreUint32(&pm.fastSync, 0)
+		atomic.StoreUint32(&pm.FastSync, 0)
 	}
-	atomic.StoreUint32(&pm.acceptTxs, 1) // Mark initial sync done
-	if head := pm.blockchain.CurrentBlock(); head.NumberU64() > 0 {
-		// We've completed a sync cycle, notify all peers of new state. This path is
+	atomic.StoreUint32(&pm.AcceptTxs, 1) // Mark initial sync done
+	if head := pm.Blockchain.GetCurrentBlock(); head.NumberU64() > 0 {
+		// We've completed a sync cycle, notify all Peers of new state. This path is
 		// essential in star-topology networks where a gateway node needs to notify
-		// all its out-of-date peers of the availability of a new block. This failure
+		// all its out-of-date Peers of the availability of a new Block. This failure
 		// scenario will most often crop up in private and hackathon networks with
 		// degenerate connectivity, but it should be healthy for the mainnet too to
-		// more reliably update peers or the local TD state.
+		// more reliably update Peers or the local TD state.
 		go pm.BroadcastBlock(head, false)
 	}
 }

@@ -28,8 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc"
+
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -40,6 +39,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/hashicorp/golang-lru"
+	"github.com/ethereum/go-ethereum/consensus/misc"
+
+	"github.com/tomochain/tomochain/consensus"
+	"github.com/tomochain/tomochain/configs"
 )
 
 const (
@@ -608,7 +611,7 @@ func (c *Clique) Finalize(chain consensus.ChainReader, header *types.Header, sta
 	// set block reward
 	// FIXME: unit Ether could be too plump
 	number := header.Number.Uint64()
-	rCheckpoint := chain.Config().Clique.RewardCheckpoint
+	rCheckpoint := configs.Config.RewardConfig.RewardCheckpoint
 
 	if c.HookReward != nil && number%rCheckpoint == 0 {
 		if err := c.HookReward(chain, state, header); err != nil {

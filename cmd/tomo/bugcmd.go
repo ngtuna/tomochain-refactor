@@ -26,11 +26,15 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/cmd/internal/browser"
+
 	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
+
 	cli "gopkg.in/urfave/cli.v1"
+
+	"github.com/tomochain/tomochain/cmd/utils"
+	"github.com/tomochain/tomochain/cmd/internal/browser"
+
 )
 
 var bugCommand = cli.Command{

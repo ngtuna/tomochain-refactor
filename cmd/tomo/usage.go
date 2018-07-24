@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/ethereum/go-ethereum/internal/debug"
+	//"github.com/tomochain/tomochain/internal/debug"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -103,11 +103,11 @@ var AppHelpFlagGroups = []flagGroup{
 	//{
 	//	Name: "DASHBOARD",
 	//	Flags: []cli.Flag{
-	//		utils.DashboardEnabledFlag,
-	//		utils.DashboardAddrFlag,
-	//		utils.DashboardPortFlag,
-	//		utils.DashboardRefreshFlag,
-	//		utils.DashboardAssetsFlag,
+	//		configs.DashboardEnabledFlag,
+	//		configs.DashboardAddrFlag,
+	//		configs.DashboardPortFlag,
+	//		configs.DashboardRefreshFlag,
+	//		configs.DashboardAssetsFlag,
 	//	},
 	//},
 	{
@@ -209,7 +209,9 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.MetricsEnabledFlag,
 			utils.FakePoWFlag,
 			utils.NoCompactionFlag,
-		}, debug.Flags...),
+		},
+		//debug.Flags...
+		),
 	},
 	{
 		Name:  "WHISPER (EXPERIMENTAL)",

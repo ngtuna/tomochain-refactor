@@ -23,6 +23,9 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
+	tomoCore "github.com/tomochain/tomochain/core"
+
+	"github.com/ethereum/go-ethereum/eth/downloader"
 )
 
 // FakePeer is a mock downloader peer that operates on a local database instance
@@ -31,18 +34,18 @@ import (
 type FakePeer struct {
 	id string
 	db ethdb.Database
-	hc *core.HeaderChain
-	dl *Downloader
+	hc *tomoCore.HeaderChain
+	dl *downloader.Downloader
 }
 
 // NewFakePeer creates a new mock downloader peer with the given data sources.
-func NewFakePeer(id string, db ethdb.Database, hc *core.HeaderChain, dl *Downloader) *FakePeer {
+func NewFakePeer(id string, db ethdb.Database, hc *tomoCore.HeaderChain, dl *downloader.Downloader) *FakePeer {
 	return &FakePeer{id: id, db: db, hc: hc, dl: dl}
 }
 
-// Head implements downloader.Peer, returning the current head hash and number
+// GetHead implements downloader.Peer, returning the current head hash and number
 // of the best known header.
-func (p *FakePeer) Head() (common.Hash, *big.Int) {
+func (p *FakePeer) GetHead() (common.Hash, *big.Int) {
 	header := p.hc.CurrentHeader()
 	return header.Hash(), header.Number
 }

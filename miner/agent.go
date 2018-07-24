@@ -21,7 +21,7 @@ import (
 
 	"sync/atomic"
 
-	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/tomochain/tomochain/consensus"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -36,7 +36,7 @@ type CpuAgent struct {
 	chain  consensus.ChainReader
 	engine consensus.Engine
 
-	isMining int32 // isMining indicates whether the agent is currently mining
+	isMining int32 // isMining indicates whether the agent is currently Mining
 }
 
 func NewCpuAgent(chain consensus.ChainReader, engine consensus.Engine) *CpuAgent {

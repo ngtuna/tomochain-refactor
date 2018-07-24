@@ -3,8 +3,8 @@
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// the Free Software Foundation, either Version 3 of the License, or
+// (at your option) any later Version.
 //
 // The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,64 +17,65 @@
 package eth
 
 import (
-	"compress/gzip"
-	"context"
-	"fmt"
-	"io"
-	"math/big"
-	"os"
-	"strings"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
+	"fmt"
+	"math/big"
+	"os"
+	"io"
+	"strings"
+	"compress/gzip"
+	"github.com/ethereum/go-ethereum/eth"
+	"github.com/tomochain/tomochain/miner"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/miner"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/params"
+	"context"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/trie"
+	tomoCore "github.com/tomochain/tomochain/core"
 )
 
-// PublicEthereumAPI provides an API to access Ethereum full node-related
+// PublicTomoChainAPI provides an API to access Ethereum full node-related
 // information.
-type PublicEthereumAPI struct {
-	e *Ethereum
+type PublicTomoChainAPI struct {
+	e *TomoChain
 }
 
 // NewPublicEthereumAPI creates a new Ethereum protocol API for full nodes.
-func NewPublicEthereumAPI(e *Ethereum) *PublicEthereumAPI {
-	return &PublicEthereumAPI{e}
+func NewPublicEthereumAPI(e *TomoChain) *PublicTomoChainAPI {
+	return &PublicTomoChainAPI{e}
 }
 
-// Etherbase is the address that mining rewards will be send to
-func (api *PublicEthereumAPI) Etherbase() (common.Address, error) {
-	return api.e.Etherbase()
+// GetEtherbase is the address that mining rewards will be send to
+func (api *PublicTomoChainAPI) Etherbase() (common.Address, error) {
+	return api.e.GetEtherbase()
 }
 
-// Coinbase is the address that mining rewards will be send to (alias for Etherbase)
-func (api *PublicEthereumAPI) Coinbase() (common.Address, error) {
+// Coinbase is the address that mining rewards will be send to (alias for GetEtherbase)
+func (api *PublicTomoChainAPI) Coinbase() (common.Address, error) {
 	return api.Etherbase()
 }
 
 // Hashrate returns the POW hashrate
-func (api *PublicEthereumAPI) Hashrate() hexutil.Uint64 {
-	return hexutil.Uint64(api.e.Miner().HashRate())
+func (api *PublicTomoChainAPI) Hashrate() hexutil.Uint64 {
+	return hexutil.Uint64(api.e.GetMiner().HashRate())
 }
 
-// PublicMinerAPI provides an API to control the miner.
+// PublicMinerAPI provides an API to control the Miner.
 // It offers only methods that operate on data that pose no security risk when it is publicly accessible.
 type PublicMinerAPI struct {
-	e     *Ethereum
+	e     *TomoChain
 	agent *miner.RemoteAgent
 }
 
 // NewPublicMinerAPI create a new PublicMinerAPI instance.
-func NewPublicMinerAPI(e *Ethereum) *PublicMinerAPI {
-	agent := miner.NewRemoteAgent(e.BlockChain(), e.Engine())
-	e.Miner().Register(agent)
+func NewPublicMinerAPI(e *TomoChain) *PublicMinerAPI {
+	agent := miner.NewRemoteAgent(e.BlockChain(), e.GetEngine())
+	e.GetMiner().Register(agent)
 
 	return &PublicMinerAPI{e, agent}
 }
@@ -84,19 +85,19 @@ func (api *PublicMinerAPI) Mining() bool {
 	return api.e.IsMining()
 }
 
-// SubmitWork can be used by external miner to submit their POW solution. It returns an indication if the work was
+// SubmitWork can be used by external Miner to submit their POW solution. It returns an indication if the work was
 // accepted. Note, this is not an indication if the provided work was valid!
 func (api *PublicMinerAPI) SubmitWork(nonce types.BlockNonce, solution, digest common.Hash) bool {
 	return api.agent.SubmitWork(nonce, digest, solution)
 }
 
-// GetWork returns a work package for external miner. The work package consists of 3 strings
+// GetWork returns a work package for external Miner. The work package consists of 3 strings
 // result[0], 32 bytes hex encoded current block header pow-hash
 // result[1], 32 bytes hex encoded seed hash used for DAG
 // result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
 func (api *PublicMinerAPI) GetWork() ([3]string, error) {
 	if !api.e.IsMining() {
-		if err := api.e.StartStaking(false); err != nil {
+		if err := api.e.StartMining(false); err != nil {
 			return [3]string{}, err
 		}
 	}
@@ -108,109 +109,109 @@ func (api *PublicMinerAPI) GetWork() ([3]string, error) {
 }
 
 // SubmitHashrate can be used for remote miners to submit their hash rate. This enables the node to report the combined
-// hash rate of all miners which submit work through this node. It accepts the miner hash rate and an identifier which
+// hash rate of all miners which submit work through this node. It accepts the Miner hash rate and an identifier which
 // must be unique between nodes.
 func (api *PublicMinerAPI) SubmitHashrate(hashrate hexutil.Uint64, id common.Hash) bool {
 	api.agent.SubmitHashrate(id, uint64(hashrate))
 	return true
 }
 
-// PrivateMinerAPI provides private RPC methods to control the miner.
+// PrivateMinerAPI provides private RPC methods to control the Miner.
 // These methods can be abused by external users and must be considered insecure for use by untrusted users.
 type PrivateMinerAPI struct {
-	e *Ethereum
+	e *TomoChain
 }
 
-// NewPrivateMinerAPI create a new RPC service which controls the miner of this node.
-func NewPrivateMinerAPI(e *Ethereum) *PrivateMinerAPI {
+// NewPrivateMinerAPI create a new RPC service which controls the Miner of this node.
+func NewPrivateMinerAPI(e *TomoChain) *PrivateMinerAPI {
 	return &PrivateMinerAPI{e: e}
 }
 
-// Start the miner with the given number of threads. If threads is nil the number
+// Start the Miner with the given number of threads. If threads is nil the number
 // of workers started is equal to the number of logical CPUs that are usable by
 // this process. If mining is already running, this method adjust the number of
 // threads allowed to use.
 func (api *PrivateMinerAPI) Start(threads *int) error {
-	// Set the number of threads if the seal engine supports it
+	// Set the number of threads if the seal GetEngine supports it
 	if threads == nil {
 		threads = new(int)
 	} else if *threads == 0 {
-		*threads = -1 // Disable the miner from within
+		*threads = -1 // Disable the Miner from within
 	}
 	type threaded interface {
 		SetThreads(threads int)
 	}
-	if th, ok := api.e.engine.(threaded); ok {
+	if th, ok := api.e.Engine.(threaded); ok {
 		log.Info("Updated mining threads", "threads", *threads)
 		th.SetThreads(*threads)
 	}
-	// Start the miner and return
+	// Start the Miner and return
 	if !api.e.IsMining() {
 		// Propagate the initial price point to the transaction pool
-		api.e.lock.RLock()
-		price := api.e.gasPrice
-		api.e.lock.RUnlock()
+		api.e.Lock.RLock()
+		price := api.e.GasPrice
+		api.e.Lock.RUnlock()
 
-		api.e.txPool.SetGasPrice(price)
-		return api.e.StartStaking(true)
+		api.e.TxPool.SetGasPrice(price)
+		return api.e.StartMining(true)
 	}
 	return nil
 }
 
-// Stop the miner
+// Stop the Miner
 func (api *PrivateMinerAPI) Stop() bool {
 	type threaded interface {
 		SetThreads(threads int)
 	}
-	if th, ok := api.e.engine.(threaded); ok {
+	if th, ok := api.e.Engine.(threaded); ok {
 		th.SetThreads(-1)
 	}
 	api.e.StopMining()
 	return true
 }
 
-// SetExtra sets the extra data string that is included when this miner mines a block.
+// SetExtra sets the extra data string that is included when this Miner mines a block.
 func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
-	if err := api.e.Miner().SetExtra([]byte(extra)); err != nil {
+	if err := api.e.GetMiner().SetExtra([]byte(extra)); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-// SetGasPrice sets the minimum accepted gas price for the miner.
+// SetGasPrice sets the minimum accepted gas price for the Miner.
 func (api *PrivateMinerAPI) SetGasPrice(gasPrice hexutil.Big) bool {
-	api.e.lock.Lock()
-	api.e.gasPrice = (*big.Int)(&gasPrice)
-	api.e.lock.Unlock()
+	api.e.Lock.Lock()
+	api.e.GasPrice = (*big.Int)(&gasPrice)
+	api.e.Lock.Unlock()
 
-	api.e.txPool.SetGasPrice((*big.Int)(&gasPrice))
+	api.e.TxPool.SetGasPrice((*big.Int)(&gasPrice))
 	return true
 }
 
-// SetEtherbase sets the etherbase of the miner
+// SetEtherbase sets the Etherbase of the Miner
 func (api *PrivateMinerAPI) SetEtherbase(etherbase common.Address) bool {
 	api.e.SetEtherbase(etherbase)
 	return true
 }
 
-// GetHashrate returns the current hashrate of the miner.
+// GetHashrate returns the current hashrate of the Miner.
 func (api *PrivateMinerAPI) GetHashrate() uint64 {
-	return uint64(api.e.miner.HashRate())
+	return uint64(api.e.Miner.HashRate())
 }
 
 // PrivateAdminAPI is the collection of Ethereum full node-related APIs
 // exposed over the private admin endpoint.
 type PrivateAdminAPI struct {
-	eth *Ethereum
+	eth *TomoChain
 }
 
 // NewPrivateAdminAPI creates a new API definition for the full node private
 // admin methods of the Ethereum service.
-func NewPrivateAdminAPI(eth *Ethereum) *PrivateAdminAPI {
+func NewPrivateAdminAPI(eth *TomoChain) *PrivateAdminAPI {
 	return &PrivateAdminAPI{eth: eth}
 }
 
-// ExportChain exports the current blockchain into a local file.
+// ExportChain exports the current Blockchain into a local file.
 func (api *PrivateAdminAPI) ExportChain(file string) (bool, error) {
 	// Make sure we can create the file to export into
 	out, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
@@ -225,14 +226,14 @@ func (api *PrivateAdminAPI) ExportChain(file string) (bool, error) {
 		defer writer.(*gzip.Writer).Close()
 	}
 
-	// Export the blockchain
+	// Export the Blockchain
 	if err := api.eth.BlockChain().Export(writer); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func hasAllBlocks(chain *core.BlockChain, bs []*types.Block) bool {
+func HasAllBlocks(chain *tomoCore.TomoBlockChain, bs []*types.Block) bool {
 	for _, b := range bs {
 		if !chain.HasBlock(b.Hash(), b.NumberU64()) {
 			return false
@@ -242,7 +243,7 @@ func hasAllBlocks(chain *core.BlockChain, bs []*types.Block) bool {
 	return true
 }
 
-// ImportChain imports a blockchain from a local file.
+// ImportChain imports a Blockchain from a local file.
 func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 	// Make sure the can access the file to import
 	in, err := os.Open(file)
@@ -278,7 +279,7 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 			break
 		}
 
-		if hasAllBlocks(api.eth.BlockChain(), blocks) {
+		if HasAllBlocks(api.eth.BlockChain(), blocks) {
 			blocks = blocks[:0]
 			continue
 		}
@@ -294,12 +295,12 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 // PublicDebugAPI is the collection of Ethereum full node APIs exposed
 // over the public debugging endpoint.
 type PublicDebugAPI struct {
-	eth *Ethereum
+	eth *TomoChain
 }
 
 // NewPublicDebugAPI creates a new API definition for the full node-
 // related public debug methods of the Ethereum service.
-func NewPublicDebugAPI(eth *Ethereum) *PublicDebugAPI {
+func NewPublicDebugAPI(eth *TomoChain) *PublicDebugAPI {
 	return &PublicDebugAPI{eth: eth}
 }
 
@@ -308,15 +309,15 @@ func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error
 	if blockNr == rpc.PendingBlockNumber {
 		// If we're dumping the pending state, we need to request
 		// both the pending block as well as the pending state from
-		// the miner and operate on those
-		_, stateDb := api.eth.miner.Pending()
+		// the Miner and operate on those
+		_, stateDb := api.eth.Miner.Pending()
 		return stateDb.RawDump(), nil
 	}
 	var block *types.Block
 	if blockNr == rpc.LatestBlockNumber {
-		block = api.eth.blockchain.CurrentBlock()
+		block = api.eth.Blockchain.GetCurrentBlock()
 	} else {
-		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
+		block = api.eth.Blockchain.GetBlockByNumber(uint64(blockNr))
 	}
 	if block == nil {
 		return state.Dump{}, fmt.Errorf("block #%d not found", blockNr)
@@ -328,66 +329,53 @@ func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error
 	return stateDb.RawDump(), nil
 }
 
-// PrivateDebugAPI is the collection of Ethereum full node APIs exposed over
-// the private debugging endpoint.
+//PrivateDebugAPI is the collection of Ethereum full node APIs exposed over
+//the private debugging endpoint.
 type PrivateDebugAPI struct {
 	config *params.ChainConfig
-	eth    *Ethereum
+	eth    *TomoChain
 }
 
-// NewPrivateDebugAPI creates a new API definition for the full node-related
-// private debug methods of the Ethereum service.
-func NewPrivateDebugAPI(config *params.ChainConfig, eth *Ethereum) *PrivateDebugAPI {
+//NewPrivateDebugAPI creates a new API definition for the full node-related
+//private debug methods of the Ethereum service.
+func NewPrivateDebugAPI(config *params.ChainConfig, eth *TomoChain) *PrivateDebugAPI {
 	return &PrivateDebugAPI{config: config, eth: eth}
 }
 
 // Preimage is a debug API function that returns the preimage for a sha3 hash, if known.
 func (api *PrivateDebugAPI) Preimage(ctx context.Context, hash common.Hash) (hexutil.Bytes, error) {
-	db := core.PreimageTable(api.eth.ChainDb())
+	db := core.PreimageTable(api.eth.GetChainDb())
 	return db.Get(hash.Bytes())
 }
 
 // GetBadBLocks returns a list of the last 'bad blocks' that the client has seen on the network
 // and returns them as a JSON list of block-hashes
 func (api *PrivateDebugAPI) GetBadBlocks(ctx context.Context) ([]core.BadBlockArgs, error) {
-	return api.eth.BlockChain().BadBlocks()
-}
-
-// StorageRangeResult is the result of a debug_storageRangeAt API call.
-type StorageRangeResult struct {
-	Storage storageMap   `json:"storage"`
-	NextKey *common.Hash `json:"nextKey"` // nil if Storage includes the last key in the trie.
-}
-
-type storageMap map[common.Hash]storageEntry
-
-type storageEntry struct {
-	Key   *common.Hash `json:"key"`
-	Value common.Hash  `json:"value"`
+	return api.eth.BlockChain().GetBadBlocks()
 }
 
 // StorageRangeAt returns the storage at the given block height and transaction index.
-func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
+func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (eth.StorageRangeResult, error) {
 	_, _, statedb, err := api.computeTxEnv(blockHash, txIndex, 0)
 	if err != nil {
-		return StorageRangeResult{}, err
+		return eth.StorageRangeResult{}, err
 	}
 	st := statedb.StorageTrie(contractAddress)
 	if st == nil {
-		return StorageRangeResult{}, fmt.Errorf("account %x doesn't exist", contractAddress)
+		return eth.StorageRangeResult{}, fmt.Errorf("account %x doesn't exist", contractAddress)
 	}
 	return storageRangeAt(st, keyStart, maxResult)
 }
 
-func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeResult, error) {
+func storageRangeAt(st state.Trie, start []byte, maxResult int) (eth.StorageRangeResult, error) {
 	it := trie.NewIterator(st.NodeIterator(start))
-	result := StorageRangeResult{Storage: storageMap{}}
+	result := eth.StorageRangeResult{Storage: eth.StorageMap{}}
 	for i := 0; i < maxResult && it.Next(); i++ {
 		_, content, _, err := rlp.Split(it.Value)
 		if err != nil {
-			return StorageRangeResult{}, err
+			return eth.StorageRangeResult{}, err
 		}
-		e := storageEntry{Value: common.BytesToHash(content)}
+		e := eth.StorageEntry{Value: common.BytesToHash(content)}
 		if preimage := st.GetKey(it.Key); preimage != nil {
 			preimage := common.BytesToHash(preimage)
 			e.Key = &preimage
@@ -410,19 +398,19 @@ func storageRangeAt(st state.Trie, start []byte, maxResult int) (StorageRangeRes
 func (api *PrivateDebugAPI) GetModifiedAccountsByNumber(startNum uint64, endNum *uint64) ([]common.Address, error) {
 	var startBlock, endBlock *types.Block
 
-	startBlock = api.eth.blockchain.GetBlockByNumber(startNum)
+	startBlock = api.eth.Blockchain.GetBlockByNumber(startNum)
 	if startBlock == nil {
 		return nil, fmt.Errorf("start block %x not found", startNum)
 	}
 
 	if endNum == nil {
 		endBlock = startBlock
-		startBlock = api.eth.blockchain.GetBlockByHash(startBlock.ParentHash())
+		startBlock = api.eth.Blockchain.GetBlockByHash(startBlock.ParentHash())
 		if startBlock == nil {
 			return nil, fmt.Errorf("block %x has no parent", endBlock.Number())
 		}
 	} else {
-		endBlock = api.eth.blockchain.GetBlockByNumber(*endNum)
+		endBlock = api.eth.Blockchain.GetBlockByNumber(*endNum)
 		if endBlock == nil {
 			return nil, fmt.Errorf("end block %d not found", *endNum)
 		}
@@ -437,19 +425,19 @@ func (api *PrivateDebugAPI) GetModifiedAccountsByNumber(startNum uint64, endNum 
 // With one parameter, returns the list of accounts modified in the specified block.
 func (api *PrivateDebugAPI) GetModifiedAccountsByHash(startHash common.Hash, endHash *common.Hash) ([]common.Address, error) {
 	var startBlock, endBlock *types.Block
-	startBlock = api.eth.blockchain.GetBlockByHash(startHash)
+	startBlock = api.eth.Blockchain.GetBlockByHash(startHash)
 	if startBlock == nil {
 		return nil, fmt.Errorf("start block %x not found", startHash)
 	}
 
 	if endHash == nil {
 		endBlock = startBlock
-		startBlock = api.eth.blockchain.GetBlockByHash(startBlock.ParentHash())
+		startBlock = api.eth.Blockchain.GetBlockByHash(startBlock.ParentHash())
 		if startBlock == nil {
 			return nil, fmt.Errorf("block %x has no parent", endBlock.Number())
 		}
 	} else {
-		endBlock = api.eth.blockchain.GetBlockByHash(*endHash)
+		endBlock = api.eth.Blockchain.GetBlockByHash(*endHash)
 		if endBlock == nil {
 			return nil, fmt.Errorf("end block %x not found", *endHash)
 		}
@@ -462,11 +450,11 @@ func (api *PrivateDebugAPI) getModifiedAccounts(startBlock, endBlock *types.Bloc
 		return nil, fmt.Errorf("start block height (%d) must be less than end block height (%d)", startBlock.Number().Uint64(), endBlock.Number().Uint64())
 	}
 
-	oldTrie, err := trie.NewSecure(startBlock.Root(), trie.NewDatabase(api.eth.chainDb), 0)
+	oldTrie, err := trie.NewSecure(startBlock.Root(), trie.NewDatabase(api.eth.ChainDb), 0)
 	if err != nil {
 		return nil, err
 	}
-	newTrie, err := trie.NewSecure(endBlock.Root(), trie.NewDatabase(api.eth.chainDb), 0)
+	newTrie, err := trie.NewSecure(endBlock.Root(), trie.NewDatabase(api.eth.ChainDb), 0)
 	if err != nil {
 		return nil, err
 	}

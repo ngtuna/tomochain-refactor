@@ -4,13 +4,17 @@ import (
 	"encoding/json"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/contracts/blocksigner/contract"
+
+
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"math/big"
+
+	ethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/tomochain/tomochain/common"
+	"github.com/tomochain/tomochain/contracts/blocksigner/contract"
 )
 
 const (
@@ -37,7 +41,7 @@ func CreateTransactionSign(chainConfig *params.ChainConfig, pool *core.TxPool, m
 
 		// Create and send tx to smart contract for sign validate block.
 		nonce := pool.State().GetNonce(account.Address)
-		tx := CreateTxSign(block.Number(), nonce, common.HexToAddress(common.BlockSigners))
+		tx := CreateTxSign(block.Number(), nonce, ethCommon.HexToAddress(common.BlockSigners))
 		txSigned, err := wallet.SignTx(account, tx, chainConfig.ChainId)
 		if err != nil {
 			log.Error("Fail to create tx sign", "error", err)
@@ -52,9 +56,9 @@ func CreateTransactionSign(chainConfig *params.ChainConfig, pool *core.TxPool, m
 }
 
 // Create tx sign.
-func CreateTxSign(blockNumber *big.Int, nonce uint64, blockSigner common.Address) *types.Transaction {
-	blockHex := common.LeftPadBytes(blockNumber.Bytes(), 32)
-	data := common.Hex2Bytes(HexSignMethod)
+func CreateTxSign(blockNumber *big.Int, nonce uint64, blockSigner ethCommon.Address) *types.Transaction {
+	blockHex := ethCommon.LeftPadBytes(blockNumber.Bytes(), 32)
+	data := ethCommon.Hex2Bytes(HexSignMethod)
 	inputData := append(data, blockHex...)
 	tx := types.NewTransaction(nonce, blockSigner, big.NewInt(0), 100000, big.NewInt(0), inputData)
 
@@ -62,7 +66,7 @@ func CreateTxSign(blockNumber *big.Int, nonce uint64, blockSigner common.Address
 }
 
 // Get signers signed for blockNumber from blockSigner contract.
-func GetSignersFromContract(addrBlockSigner common.Address, client bind.ContractBackend, blockNumber uint64) ([]common.Address, error) {
+func GetSignersFromContract(addrBlockSigner ethCommon.Address, client bind.ContractBackend, blockNumber uint64) ([]ethCommon.Address, error) {
 	blockSigner, err := contract.NewBlockSigner(addrBlockSigner, client)
 	if err != nil {
 		log.Error("Fail get instance of blockSigner", "error", err)
@@ -79,11 +83,11 @@ func GetSignersFromContract(addrBlockSigner common.Address, client bind.Contract
 }
 
 // Calculate reward for reward checkpoint.
-func GetRewardForCheckpoint(blockSignerAddr common.Address, number uint64, rCheckpoint uint64, client bind.ContractBackend, totalSigner *uint64) (map[common.Address]*rewardLog, error) {
+func GetRewardForCheckpoint(blockSignerAddr ethCommon.Address, number uint64, rCheckpoint uint64, client bind.ContractBackend, totalSigner *uint64) (map[ethCommon.Address]*rewardLog, error) {
 	// Not reward for singer of genesis block and only calculate reward at checkpoint block.
 	startBlockNumber := number - (rCheckpoint * 2) + 1
 	endBlockNumber := startBlockNumber + rCheckpoint - 1
-	signers := make(map[common.Address]*rewardLog)
+	signers := make(map[ethCommon.Address]*rewardLog)
 
 	for i := startBlockNumber; i <= endBlockNumber; i++ {
 		addrs, err := GetSignersFromContract(blockSignerAddr, client, i)
@@ -93,7 +97,7 @@ func GetRewardForCheckpoint(blockSignerAddr common.Address, number uint64, rChec
 		}
 		// Filter duplicate address.
 		if len(addrs) > 0 {
-			addrSigners := make(map[common.Address]bool)
+			addrSigners := make(map[ethCommon.Address]bool)
 			for _, addr := range addrs {
 				if _, ok := addrSigners[addr]; !ok {
 					addrSigners[addr] = true
@@ -117,8 +121,8 @@ func GetRewardForCheckpoint(blockSignerAddr common.Address, number uint64, rChec
 }
 
 // Calculate reward for signers.
-func CalculateReward(chainReward *big.Int, signers map[common.Address]*rewardLog, totalSigner uint64) (map[common.Address]*big.Int, error) {
-	resultSigners := make(map[common.Address]*big.Int)
+func CalculateReward(chainReward *big.Int, signers map[ethCommon.Address]*rewardLog, totalSigner uint64) (map[ethCommon.Address]*big.Int, error) {
+	resultSigners := make(map[ethCommon.Address]*big.Int)
 	// Add reward for signers.
 	for signer, rLog := range signers {
 		// Add reward for signer.
